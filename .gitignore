@@ -1,41 +1,83 @@
-# Python / Django
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
 *.so
-*.dll
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Virtual environments
+# Virtual Environment
 venv/
-.env/
 .venv/
+env/
+.env/
+ENV/
 
-# Environment files
+# Environment variables (Secrets)
 .env
+.env.*
+backend/.env
+frontend/.env
+**/.env
+**/.env.*
 
-# Django / DB
-*.sqlite3
-*.sqlite3-journal
+# Django
+db.sqlite3
+db.sqlite3-journal
+backend/staticfiles/
+backend/static/
+backend/media/
+staticfiles/
+static/
+media/
+*.log
+local_settings.py
 
-# IDE / editor
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code / IDE
 .vscode/
 .idea/
-*.iml
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Node / frontend (if any)
+# Frontend / Node
 node_modules/
-.dist/
-.build/
-
-# Local config overrides
-*.local
-*.log
-
-# Generated Static/Media files
-staticfiles/
-media/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next/
+out/
+build/

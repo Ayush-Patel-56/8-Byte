@@ -20,7 +20,7 @@ const ALL_EMOJIS = [
 ];
 
 export function initCommunity() {
-    if (!window.location.pathname.includes('/community/')) return;
+    if (!window.location.pathname.includes('/community.html')) return;
 
     const messagesContainer = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');

@@ -4,10 +4,11 @@ export function initDashboard() {
     // -------------------------------------------------------------
     // PART 3: DASHBOARD LOGIC (EDIT PROFILE & GALLERY)
     // -------------------------------------------------------------
-    if (window.location.pathname.includes('/dashboard/')) {
+    const path = window.location.pathname;
+    if (path.endsWith('/dashboard.html') || path.includes('/dashboard/')) {
 
         const token = localStorage.getItem('access');
-        if (!token) window.location.href = '/'; // Redirect if not logged in
+        if (!token) window.location.href = '/index.html'; // Redirect if not logged in
 
         // Elements
         const titleInput = document.getElementById('title-input');
@@ -118,7 +119,7 @@ export function initDashboard() {
 
                     if (data.avatar) avatarPreview.src = data.avatar;
 
-                    const publicUrl = `/u/${data.username}/`;
+                    const publicUrl = `/public_profile.html?u=${data.username}`;
                     console.log("Updating View Public Page link to:", publicUrl);
                     viewPublicBtn.href = publicUrl;
                 } else {
@@ -313,7 +314,7 @@ export function initDashboard() {
         // Logout
         document.getElementById('logout-btn').addEventListener('click', () => {
             localStorage.clear();
-            window.location.href = '/';
+            window.location.href = '/index.html';
         });
 
         // Share Profile Link

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body class="min-h-screen text-white">
+
+    <!-- Background Layers -->
+    <div class="bg-fluid"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <div class="pt-8 pb-12 px-4 max-w-4xl mx-auto z-10 relative">
+
+        <!-- Profile Header — populated by public_profile.js -->
+        <div class="glass-card rounded-2xl p-8 mb-8 text-center">
+
+            <!-- Avatar -->
+            <div class="relative w-32 h-32 mx-auto mb-6" id="profile-avatar-container">
+                <!-- JS will inject either <img> or initial letter div here -->
+                <div class="w-full h-full rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-4xl font-bold" id="profile-avatar-placeholder">?</div>
+            </div>
+
+            <!-- Title & Description -->
+            <h1 class="text-4xl font-black tracking-tight mb-2" id="profile-title-display">
+                <!-- JS populates -->
+                <span id="profile-title-text"></span>
+                <span id="profile-pronouns" class="text-lg text-gray-400 font-normal align-middle ml-2"></span>
+            </h1>
+            <p class="text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed" id="profile-description"></p>
+
+            <!-- Social / Contact — JS populates -->
+            <div class="flex justify-center gap-4 mt-6" id="profile-social-links">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+
+        <!-- Education Section -->
+        <div id="education-section" class="glass-card rounded-2xl p-8 mb-8 hidden">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-graduation-cap text-[#00b4d8]"></i> Education
+            </h2>
+            <div id="education-list-public" class="space-y-4">
+                <!-- Education entries will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Experience Section -->
+        <div id="experience-section" class="glass-card rounded-2xl p-8 mb-8 hidden">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-briefcase text-[#00b4d8]"></i> Experience
+            </h2>
+            <div id="experience-list-public" class="space-y-4">
+                <!-- Experience entries will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Skills Section -->
+        <div id="skills-section" class="glass-card rounded-2xl p-8 mb-8 hidden">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-lightbulb text-[#00b4d8]"></i> Skills
+            </h2>
+            <div id="skills-list-public" class="flex flex-wrap gap-2">
+                <!-- Skills will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Gallery Grid — JS populates -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" id="gallery-grid-public">
+            <!-- Photos injected by JS -->
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-16 text-center text-gray-500 text-sm">
+            <p>Made with <i class="fas fa-heart text-red-500"></i> by <span id="footer-display-name"></span></p>
+            <a href="/index.html" class="hover:text-[#00b4d8] mt-2 inline-block">Create your own page</a>
+        </div>
+
+    </div>
+
+    <!-- Instagram-style Lightbox Modal -->
+    <div id="lightbox-modal"
+        class="fixed inset-0 z-50 bg-black/60 hidden flex items-center justify-center p-4 backdrop-blur-md transition-opacity duration-300">
+        <!-- Close Button -->
+        <button id="lightbox-close"
+            class="absolute top-4 right-4 text-white/70 hover:text-red-500 transition-colors z-[60] p-2">
+            <i class="fas fa-times text-3xl"></i>
+        </button>
+
+        <!-- Main Card Container (Glass Effect) -->
+        <div class="flex flex-col lg:flex-row w-full max-w-6xl max-h-[90vh] bg-gray-900/60 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative"
+            onclick="event.stopPropagation()">
+
+            <!-- Left: Image Area -->
+            <div
+                class="flex-1 bg-black/20 flex items-center justify-center relative min-h-[40vh] lg:min-h-full overflow-hidden">
+                <img id="lightbox-img" src="" class="max-w-full max-h-[50vh] lg:max-h-full object-contain">
+            </div>
+
+            <!-- Right: Sidebar (User Info & Caption & Comments) -->
+            <div
+                class="w-full lg:w-[400px] bg-white/5 backdrop-blur-md flex flex-col border-l border-white/10 lg:h-auto">
+
+                <!-- 1. Header — JS populates avatar and username -->
+                <div class="p-4 border-b border-white/10 flex items-center gap-3 shrink-0">
+                    <div class="w-8 h-8 rounded-full bg-gray-700 overflow-hidden border border-white/20" id="lightbox-avatar-container">
+                        <!-- JS injects avatar -->
+                    </div>
+                    <span class="font-bold text-white text-sm" id="lightbox-username"></span>
+                </div>
+
+                <!-- 2. Scrollable Content (Caption + Comments) -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-4" id="lightbox-comments-container">
+                    <!-- Caption Block -->
+                    <div class="flex gap-3 mb-4">
+                        <div class="w-8 h-8 shrink-0" id="lightbox-caption-avatar">
+                            <!-- JS injects avatar -->
+                        </div>
+                        <div>
+                            <span class="font-bold text-white text-sm mr-2" id="lightbox-caption-username"></span>
+                            <span id="lightbox-caption" class="text-sm text-gray-300 leading-relaxed"></span>
+                        </div>
+                    </div>
+
+                    <!-- Comments Injection Point -->
+                    <div id="comments-list" class="space-y-3">
+                        <!-- Comments will be injected here via JS -->
+                    </div>
+                </div>
+
+                <!-- 3. Actions Footer -->
+                <div class="p-4 border-t border-white/10 mt-auto bg-black/20 shrink-0">
+                    <div class="flex items-center gap-4 text-2xl mb-2 text-white">
+                        <button id="like-btn" class="hover:scale-110 transition active:scale-95 focus:outline-none">
+                            <i class="fas fa-infinity"></i>
+                        </button>
+                        <i class="far fa-comment cursor-pointer hover:text-blue-500 transition"></i>
+                        <i class="far fa-paper-plane cursor-pointer hover:text-green-500 transition"></i>
+                    </div>
+                    <p id="like-count" class="text-sm font-bold text-white mb-2">0 x Aura</p>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wide mb-3">Posted recently</p>
+
+                    <!-- Add Comment Form -->
+                    <form id="comment-form" class="flex items-center gap-2 border-t border-white/10 pt-3">
+                        <input type="text" id="comment-input" placeholder="Add a comment..."
+                            class="bg-transparent text-sm text-white focus:outline-none flex-1 placeholder-gray-500"
+                            autocomplete="off">
+                        <button type="submit"
+                            class="text-blue-400 font-bold text-sm hover:text-white disabled:opacity-50" disabled
+                            id="post-comment-btn">Post</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Script (Module) -->
+    <script type="module" src="./main.js"></script>
+</body>
+
+</html>

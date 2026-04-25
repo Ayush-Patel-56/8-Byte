@@ -232,7 +232,7 @@ class DirectThreadSerializer(serializers.ModelSerializer):
             'username': other.username,
             'display_name': display_name,
             'avatar': avatar_url,
-            'profile_url': f'/u/{other.username}/',
+            'profile_url': f'/public_profile.html?u={other.username}',
             'is_online': is_online,
         }
 
@@ -350,7 +350,7 @@ class UserSearchSerializer(serializers.ModelSerializer):
         return None
 
     def get_profile_url(self, obj):
-        return f'/u/{obj.username}/'
+        return f'/public_profile.html?u={obj.username}'
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])

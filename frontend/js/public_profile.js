@@ -1,7 +1,27 @@
-export function initPublicProfile() {
-    if (!window.location.pathname.includes('/u/')) return;
+import { API_BASE } from './utils.js';
 
-    console.log("Initializing Public Profile Lightbox...");
+export function initPublicProfile() {
+    const isStaticPage = window.location.pathname.endsWith('/public_profile.html');
+    const isLegacyPath = window.location.pathname.includes('/u/');
+    if (!isStaticPage && !isLegacyPath) return;
+
+    // --- Resolve username from URL ---
+    // Static Vercel: /public_profile.html?u=username
+    // Legacy Django:  /u/username/
+    function getUsername() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('u')) return params.get('u');
+        const pathParts = window.location.pathname.split('/');
+        return pathParts[2] || null;
+    }
+
+    const USERNAME = getUsername();
+    if (!USERNAME) {
+        document.body.innerHTML = '<p class="text-center text-red-400 p-8">User not found.</p>';
+        return;
+    }
+
+    console.log("Initializing Public Profile for:", USERNAME);
 
     const galleryItems = document.querySelectorAll('.gallery-item');
     const lightboxModal = document.getElementById('lightbox-modal');
@@ -24,7 +44,10 @@ export function initPublicProfile() {
 
     if (!lightboxModal) return;
 
-    // Helper: Auth Header
+    // --- Helper: absolute API URL ---
+    const api = (path) => `${API_BASE}${path}`;
+
+    // --- Helper: Auth Header ---
     function getAuthHeaders() {
         return {
             'Authorization': `Bearer ${accessToken}`,
@@ -32,11 +55,123 @@ export function initPublicProfile() {
         };
     }
 
+    // --- Render Profile Header ---
+    async function loadProfileHeader() {
+        try {
+            const headers = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
+            const res = await fetch(api(`/api/profile/?username=${USERNAME}`), { headers });
+            if (!res.ok) return;
+            const data = await res.json();
+
+            // Avatar
+            const avatarContainer = document.getElementById('profile-avatar-container');
+            const avatarPlaceholder = document.getElementById('profile-avatar-placeholder');
+            if (data.avatar) {
+                avatarContainer.innerHTML = `<img src="${data.avatar}" class="w-full h-full rounded-full object-cover border-4 border-white/10 shadow-2xl">`;
+            } else {
+                avatarPlaceholder.textContent = USERNAME[0].toUpperCase();
+            }
+
+            // Title & Description
+            document.getElementById('profile-title-text').textContent = data.title || '';
+            const pronounsEl = document.getElementById('profile-pronouns');
+            const pronounMap = { M: '(he/him)', F: '(she/her)', O: '(they/them)', N: '', '': '' };
+            pronounsEl.textContent = pronounMap[data.gender] || '';
+            document.getElementById('profile-description').textContent = data.description || '';
+
+            // Page title
+            document.title = `${data.display_name || USERNAME}'s Profile`;
+
+            // Footer name
+            const footerEl = document.getElementById('footer-display-name');
+            if (footerEl) footerEl.textContent = data.display_name || USERNAME;
+
+            // Social links
+            const socialContainer = document.getElementById('profile-social-links');
+            let socialHTML = '';
+            if (data.instagram) socialHTML += `<a href="${data.instagram}" target="_blank" class="btn-secondary rounded-full w-10 h-10 flex items-center justify-center hover:text-pink-500 transition"><i class="fab fa-instagram"></i></a>`;
+            if (data.linkedin)  socialHTML += `<a href="${data.linkedin}"  target="_blank" class="btn-secondary rounded-full w-10 h-10 flex items-center justify-center hover:text-blue-500 transition"><i class="fab fa-linkedin"></i></a>`;
+            if (data.github)    socialHTML += `<a href="${data.github}"    target="_blank" class="btn-secondary rounded-full w-10 h-10 flex items-center justify-center hover:text-white transition"><i class="fab fa-github"></i></a>`;
+            if (data.gmail)     socialHTML += `<a href="mailto:${data.gmail}" class="btn-secondary rounded-full w-10 h-10 flex items-center justify-center hover:text-red-500 transition"><i class="fas fa-envelope"></i></a>`;
+            socialContainer.innerHTML = socialHTML;
+
+            // Lightbox avatar + username
+            const lbAvatar = document.getElementById('lightbox-avatar-container');
+            const lbUsername = document.getElementById('lightbox-username');
+            const lbCaptionAvatar = document.getElementById('lightbox-caption-avatar');
+            const lbCaptionUsername = document.getElementById('lightbox-caption-username');
+            const avatarHTML = data.avatar
+                ? `<img src="${data.avatar}" class="w-full h-full object-cover">`
+                : `<div class="w-full h-full bg-blue-500 flex items-center justify-center text-xs font-bold">${USERNAME[0].toUpperCase()}</div>`;
+            if (lbAvatar) lbAvatar.innerHTML = avatarHTML;
+            if (lbUsername) lbUsername.textContent = data.username || USERNAME;
+            if (lbCaptionAvatar) lbCaptionAvatar.innerHTML = `<div class="w-full h-full rounded-full overflow-hidden">${avatarHTML}</div>`;
+            if (lbCaptionUsername) lbCaptionUsername.textContent = data.username || USERNAME;
+        } catch (err) {
+            console.error('Failed to load profile header:', err);
+        }
+    }
+    loadProfileHeader();
+
+    // --- Load Gallery ---
+    async function loadGallery() {
+        try {
+            const headers = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
+            const res = await fetch(api(`/api/photos/?username=${USERNAME}`), { headers });
+            if (!res.ok) return;
+            const photos = await res.json();
+            const galleryGrid = document.getElementById('gallery-grid-public');
+            if (!galleryGrid) return;
+            if (photos.length === 0) {
+                galleryGrid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500"><i class="fas fa-camera text-4xl mb-4 opacity-50"></i><p>No photos yet.</p></div>`;
+                return;
+            }
+            galleryGrid.innerHTML = photos.map(photo => `
+                <div class="glass-card rounded-xl overflow-hidden hover:scale-[1.02] transition duration-300 cursor-pointer group">
+                    <img src="${photo.image}" data-caption="${photo.caption || ''}" data-photo-id="${photo.id}"
+                        class="w-full aspect-square object-cover gallery-item group-hover:opacity-90 transition">
+                    ${photo.caption ? `<div class="p-4"><p class="text-sm text-gray-300 truncate">${photo.caption}</p></div>` : ''}
+                </div>
+            `).join('');
+            // Attach lightbox listeners to dynamically injected images
+            setupGalleryListeners();
+        } catch (err) {
+            console.error('Failed to load gallery:', err);
+        }
+    }
+    loadGallery();
+
+    function setupGalleryListeners() {
+        document.querySelectorAll('.gallery-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const imgSrc = item.getAttribute('src');
+                const caption = item.getAttribute('data-caption');
+                const photoId = item.getAttribute('data-photo-id');
+                if (imgSrc) {
+                    lightboxImg.src = imgSrc;
+                    if (lightboxCaption) lightboxCaption.textContent = caption || '';
+                    lightboxModal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                    if (photoId) {
+                        loadPhotoData(photoId, false);
+                        if (pollingInterval) clearInterval(pollingInterval);
+                        pollingInterval = setInterval(() => {
+                            const isOpen = currentPhotoId && !document.getElementById('lightbox-modal').classList.contains('hidden');
+                            const isInteracting = replyingToId !== null || (commentInput && commentInput.value.trim().length > 0);
+                            if (isOpen && !isInteracting) loadPhotoData(currentPhotoId, true);
+                        }, 3000);
+                    }
+                }
+            });
+        });
+    }
+
     // --- Fetch Current User ---
     async function fetchCurrentUser() {
-        if (!accessToken) return null; // Add return value
+        if (!accessToken) return null;
         try {
-            const res = await fetch('/api/me/', { headers: getAuthHeaders() });
+            const res = await fetch(api('/api/me/'), { headers: getAuthHeaders() });
             if (res.ok) {
                 currentUser = await res.json();
                 return currentUser;
@@ -51,9 +186,7 @@ export function initPublicProfile() {
 
     // --- Load Education Data ---
     async function loadEducation() {
-        // Get username from URL path: /u/username/
-        const pathParts = window.location.pathname.split('/');
-        const username = pathParts[2]; // /u/[username]/
+        const username = USERNAME;
 
         if (!username) return;
 
@@ -64,7 +197,7 @@ export function initPublicProfile() {
             } : { 'Content-Type': 'application/json' };
 
             // Fetch public data filtering by username
-            const res = await fetch(`/api/education/?username=${username}`, { headers });
+            const res = await fetch(api(`/api/education/?username=${username}`), { headers });
 
             if (res.ok) {
                 const educations = await res.json();
@@ -97,9 +230,7 @@ export function initPublicProfile() {
 
     // --- Load Experience Data ---
     async function loadExperience() {
-        // Get username from URL path: /u/username/
-        const pathParts = window.location.pathname.split('/');
-        const username = pathParts[2]; // /u/[username]/
+        const username = USERNAME;
 
         if (!username) return;
 
@@ -110,7 +241,7 @@ export function initPublicProfile() {
             } : { 'Content-Type': 'application/json' };
 
             // Fetch public data filtering by username
-            const res = await fetch(`/api/experience/?username=${username}`, { headers });
+            const res = await fetch(api(`/api/experience/?username=${username}`), { headers });
 
             if (res.ok) {
                 const experiences = await res.json();
@@ -154,9 +285,7 @@ export function initPublicProfile() {
 
     // --- Load Skills Data ---
     async function loadSkills() {
-        // Get username from URL path: /u/username/
-        const pathParts = window.location.pathname.split('/');
-        const username = pathParts[2]; // /u/[username]/
+        const username = USERNAME;
 
         if (!username) return;
 
@@ -167,7 +296,7 @@ export function initPublicProfile() {
             } : { 'Content-Type': 'application/json' };
 
             // Fetch public data filtering by username
-            const res = await fetch(`/api/skills/?username=${username}`, { headers });
+            const res = await fetch(api(`/api/skills/?username=${username}`), { headers });
 
             if (res.ok) {
                 const skills = await res.json();
@@ -213,7 +342,7 @@ export function initPublicProfile() {
         try {
             // A. Fetch Likes Status
             const likeHeaders = accessToken ? getAuthHeaders() : { 'Content-Type': 'application/json' };
-            const likeRes = await fetch(`/api/photos/${photoId}/like/`, { headers: likeHeaders });
+            const likeRes = await fetch(api(`/api/photos/${photoId}/like/`), { headers: likeHeaders });
 
             if (likeRes.ok) {
                 const likeData = await likeRes.json();
@@ -221,7 +350,7 @@ export function initPublicProfile() {
             }
 
             // B. Fetch Comments
-            const commentsRes = await fetch(`/api/photos/${photoId}/comments/`, { headers: likeHeaders });
+            const commentsRes = await fetch(api(`/api/photos/${photoId}/comments/`), { headers: likeHeaders });
             if (commentsRes.ok) {
                 const comments = await commentsRes.json();
                 renderComments(comments);
@@ -265,8 +394,7 @@ export function initPublicProfile() {
     // Helper to render single comment (recursive)
     function createCommentHTML(comment, isNested = false) {
         const currentUsername = currentUser ? currentUser.username : null;
-        const pathParts = window.location.pathname.split('/');
-        const profileOwnerUsername = pathParts[2];
+        const profileOwnerUsername = USERNAME;
         const isAuthor = currentUsername === comment.username;
         const isProfileOwner = currentUsername === profileOwnerUsername;
         const isOwner = currentUsername && (isAuthor || isProfileOwner);
@@ -378,7 +506,7 @@ export function initPublicProfile() {
         if (!commentId || !accessToken) return;
 
         try {
-            const res = await fetch(`/api/comments/${commentId}/`, {
+            const res = await fetch(api(`/api/comments/${commentId}/`), {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
@@ -410,7 +538,7 @@ export function initPublicProfile() {
             updateLikeUI(!isLiked, isLiked ? count - 1 : count + 1);
 
             try {
-                const res = await fetch(`/api/photos/${currentPhotoId}/like/`, {
+                const res = await fetch(api(`/api/photos/${currentPhotoId}/like/`), {
                     method: 'POST',
                     headers: getAuthHeaders()
                 });
@@ -456,7 +584,7 @@ export function initPublicProfile() {
             }
 
             try {
-                const res = await fetch(`/api/photos/${currentPhotoId}/comments/`, {
+                const res = await fetch(api(`/api/photos/${currentPhotoId}/comments/`), {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify(payload)
@@ -482,8 +610,8 @@ export function initPublicProfile() {
     }
 
 
-    // --- 3. Lightbox Open Logic ---
-    galleryItems.forEach(item => {
+    // --- 3. Lightbox Open Logic --- (for Django-rendered gallery items)
+    document.querySelectorAll('.gallery-item').forEach(item => {
         item.addEventListener('click', (e) => {
             e.stopPropagation();
             const imgSrc = item.getAttribute('src');

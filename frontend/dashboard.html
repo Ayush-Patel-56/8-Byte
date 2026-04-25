@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Edit Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body class="min-h-screen text-white">
+
+    <!-- Background Layers -->
+    <div class="bg-fluid"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Navbar -->
+    <nav
+        class="fixed top-0 w-full z-50 glass-card border-b border-white/10 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-6">
+            <div class="font-bold text-xl tracking-tight">Dashboard</div>
+        </div>
+        <div class="flex gap-4">
+            <button id="share-profile-btn" class="text-sm font-medium hover:text-[#00b4d8] transition">
+                <i class="fas fa-share-alt mr-1"></i> Share Profile
+            </button>
+            <a id="view-public-btn" href="#" target="_blank"
+                class="text-sm font-medium hover:text-[#00b4d8] transition">View Public Page</a>
+            <button id="logout-btn"
+                class="text-sm font-medium text-red-400 hover:text-red-300 transition">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Community + Messages Buttons (Floated Right) -->
+    <div class="fixed top-24 right-6 z-40 hidden lg:block">
+        <div class="flex flex-col gap-3">
+            <a href="/community.html"
+                class="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl text-base font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 transition hover:shadow-cyan-500/40"
+                target="_blank">
+                <i class="fas fa-users text-lg"></i>
+                <span>Community Chat</span>
+            </a>
+
+            <a href="/direct_messages.html"
+                class="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-base font-bold shadow-lg shadow-purple-500/20 hover:scale-105 transition hover:shadow-purple-500/40"
+                target="_blank">
+                <i class="fas fa-comment-dots text-lg"></i>
+                <span>Messages</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Mobile Community + Messages Buttons (Visible only on small screens) -->
+    <div class="lg:hidden fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+        <a href="/community.html"
+            class="flex items-center justify-center w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/20 hover:scale-105 transition">
+            <i class="fas fa-users text-xl"></i>
+        </a>
+        <a href="/direct_messages.html"
+            class="flex items-center justify-center w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-lg shadow-purple-500/20 hover:scale-105 transition"
+            target="_blank">
+            <i class="fas fa-comment-dots text-xl"></i>
+        </a>
+    </div>
+
+    <!-- User Search Bar (Desktop - Fixed Left Side) -->
+    <div class="fixed top-24 left-6 z-40 w-80 hidden lg:block">
+        <div class="relative group">
+            <i
+                class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-cyan-400 transition"></i>
+            <input type="text" id="user-search-input" placeholder="Search users..."
+                class="w-full glass-card pl-12 pr-4 py-3 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition shadow-lg">
+        </div>
+
+        <!-- Dropdown Results (Desktop) -->
+        <div id="search-dropdown"
+            class="absolute top-full left-0 right-0 mt-2 glass-card rounded-xl overflow-hidden hidden shadow-2xl z-50 max-h-80 overflow-y-auto border border-white/10">
+            <!-- Results injected here -->
+        </div>
+    </div>
+
+    <!-- Main Content Container with responsive padding -->
+    <div class="pt-24 pb-12 px-4 max-w-4xl mx-auto z-10 relative lg:ml-96">
+
+        <!-- User Search Bar (Mobile - At top of content) -->
+        <div class="mb-8 relative max-w-md lg:hidden">
+            <div class="relative group">
+                <i
+                    class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-cyan-400 transition"></i>
+                <input type="text" id="user-search-input-mobile" placeholder="Search users..."
+                    class="w-full glass-card pl-12 pr-4 py-3 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition shadow-lg">
+            </div>
+
+            <!-- Dropdown Results (Mobile) -->
+            <div id="search-dropdown-mobile"
+                class="absolute top-full left-0 right-0 mt-2 glass-card rounded-xl overflow-hidden hidden shadow-2xl z-50 max-h-80 overflow-y-auto border border-white/10">
+                <!-- Results injected here -->
+            </div>
+        </div>
+
+
+        <!-- Profile Edit Section -->
+        <div class="glass-card rounded-2xl p-8 mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-user-edit text-[#00b4d8]"></i> Edit Profile
+            </h2>
+
+            <form id="profile-form" class="space-y-6">
+
+                <!-- Avatar Upload -->
+                <div class="flex items-center gap-6">
+                    <div class="relative group">
+                        <img id="avatar-preview" src="https://via.placeholder.com/150"
+                            class="w-24 h-24 rounded-full object-cover border-2 border-white/20">
+                        <label for="avatar-input"
+                            class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition">
+                            <i class="fas fa-camera text-white"></i>
+                        </label>
+                        <input type="file" id="avatar-input" accept="image/*" class="hidden">
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg">Profile Picture</h3>
+                        <p class="text-sm text-gray-400">Click the image to upload a new one.</p>
+                    </div>
+                </div>
+
+                <!-- Text Fields -->
+                <div class="grid gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Title</label>
+                        <input type="text" id="title-input" class="input" placeholder="e.g. Welcome to my world">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Description</label>
+                        <textarea id="desc-input" rows="3" class="input"
+                            placeholder="Tell us about yourself..."></textarea>
+                    </div>
+
+                    <!-- Gender Select -->
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Gender</label>
+                        <select id="gender-input" class="input appearance-none">
+                            <option value="">Select Gender</option>
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                            <option value="O">Other</option>
+                            <option value="N">Prefer not to say</option>
+                        </select>
+                    </div>
+
+                    <!-- Social Links -->
+                    <div class="pt-4 border-t border-white/10">
+                        <h3 class="font-bold text-lg mb-4">Social Links</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1"><i
+                                        class="fab fa-instagram text-pink-500"></i> Instagram</label>
+                                <input type="url" id="instagram-input" class="input"
+                                    placeholder="https://instagram.com/...">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1"><i
+                                        class="fab fa-linkedin text-blue-500"></i> LinkedIn</label>
+                                <input type="url" id="linkedin-input" class="input"
+                                    placeholder="https://linkedin.com/in/...">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1"><i class="fab fa-github text-white"></i>
+                                    GitHub</label>
+                                <input type="url" id="github-input" class="input" placeholder="https://github.com/...">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-1"><i
+                                        class="fas fa-envelope text-red-500"></i> Gmail</label>
+                                <input type="email" id="gmail-input" class="input" placeholder="your.email@gmail.com">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Save Button Removed from here -->
+            </form>
+        </div>
+
+        <!-- Education Section -->
+        <div class="glass-card rounded-2xl p-8 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    <i class="fas fa-graduation-cap text-[#00b4d8]"></i> Education
+                </h2>
+                <button id="add-education-btn" class="btn-secondary text-sm">
+                    <i class="fas fa-plus"></i> Add Education
+                </button>
+            </div>
+
+            <!-- Education Entries List -->
+            <div id="education-list" class="space-y-4">
+                <!-- Education entries will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Experience Section -->
+        <div class="glass-card rounded-2xl p-8 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    <i class="fas fa-briefcase text-[#00b4d8]"></i> Experience
+                </h2>
+                <button id="add-experience-btn" class="btn-secondary text-sm">
+                    <i class="fas fa-plus"></i> Add Experience
+                </button>
+            </div>
+
+            <!-- Experience Entries List -->
+            <div id="experience-list" class="space-y-4">
+                <!-- Experience entries will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Skills Section -->
+        <div class="glass-card rounded-2xl p-8 mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-lightbulb text-[#00b4d8]"></i> Skills
+            </h2>
+
+            <!-- Add Skill Input -->
+            <div class="mb-4">
+                <div class="flex gap-2">
+                    <input type="text" id="skill-input" class="input flex-1"
+                        placeholder="Enter a skill and press Enter">
+                    <button id="add-skill-btn" class="btn-primary">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                </div>
+            </div>
+
+            <!-- Suggested Skills -->
+            <div class="mb-6">
+                <p class="text-sm text-gray-400 mb-3 flex items-center gap-2">
+                    <i class="fas fa-star"></i> Quick Add - Popular Skills:
+                </p>
+                <div class="flex flex-wrap gap-2" id="suggested-skills">
+                    <button class="suggested-skill-btn" data-skill="UI/UX Design">
+                        <i class="fas fa-paint-brush"></i> UI/UX Design
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Software Engineering">
+                        <i class="fas fa-code"></i> Software Engineering
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Game Development">
+                        <i class="fas fa-gamepad"></i> Game Development
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Mobile Games">
+                        <i class="fas fa-mobile-alt"></i> Mobile Games
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Video Editor">
+                        <i class="fas fa-video"></i> Video Editor
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Photographer">
+                        <i class="fas fa-camera"></i> Photographer
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Gaming Industry">
+                        <i class="fas fa-trophy"></i> Gaming Industry
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Online Gaming">
+                        <i class="fas fa-wifi"></i> Online Gaming
+                    </button>
+                    <button class="suggested-skill-btn" data-skill="Construction Management">
+                        <i class="fas fa-hard-hat"></i> Construction Management
+                    </button>
+                </div>
+            </div>
+
+            <!-- User's Skills List -->
+            <div id="skills-list" class="flex flex-wrap gap-2">
+                <!-- Skills will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Gallery Section -->
+        <div class="glass-card rounded-2xl p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    <i class="fas fa-images text-[#00b4d8]"></i> Gallery
+                    <span id="photo-count" class="text-sm font-normal text-gray-400 ml-2">(0/6)</span>
+                </h2>
+                <button id="add-photo-btn" class="btn-secondary text-sm">
+                    <i class="fas fa-plus"></i> Add Photo
+                </button>
+            </div>
+
+            <!-- Photo Grid -->
+            <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <!-- Photos will be injected here via JS -->
+            </div>
+        </div>
+
+        <!-- Save Changes Button (Moved to bottom) -->
+        <div class="mt-8 flex justify-center pb-12">
+            <button type="submit" form="profile-form"
+                class="btn-primary w-full sm:w-auto px-12 py-4 text-lg font-bold shadow-2xl hover:scale-105 transition-transform duration-200">
+                Save Changes
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Upload Photo Modal -->
+    <div id="photo-modal" class="modal hidden">
+        <div class="modal-panel">
+            <h3 class="text-xl font-bold mb-4">Upload Photo</h3>
+            <form id="photo-form" class="space-y-4">
+                <div
+                    class="border-2 border-dashed border-white/20 rounded-xl h-48 flex items-center justify-center relative overflow-hidden group hover:bg-white/5 transition">
+                    <input type="file" id="photo-input" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-20">
+
+                    <!-- Placeholder Content -->
+                    <div id="photo-placeholder" class="text-center pointer-events-none">
+                        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm text-gray-400" id="photo-filename">Click to select image</p>
+                    </div>
+
+                    <!-- Image Preview -->
+                    <img id="photo-preview-img" class="absolute inset-0 w-full h-full object-cover hidden z-10">
+                </div>
+
+                <input type="text" id="caption-input" placeholder="Caption (optional)" class="input">
+
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary flex-1">Upload</button>
+                    <button type="button" id="photo-cancel" class="btn-secondary flex-1">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cropper Modal -->
+    <div id="cropper-modal" class="modal hidden">
+        <div class="modal-panel max-w-2xl w-full">
+            <h3 class="text-xl font-bold mb-4">Crop Image</h3>
+            <div class="h-96 bg-black rounded-lg overflow-hidden mb-4">
+                <img id="cropper-image" class="max-w-full">
+            </div>
+            <div class="flex gap-3">
+                <button id="crop-save-btn" class="btn-primary flex-1">Crop & Save</button>
+                <button id="crop-cancel-btn" class="btn-secondary flex-1">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Education Modal -->
+    <div id="education-modal" class="modal hidden">
+        <div class="modal-panel">
+            <h3 class="text-xl font-bold mb-4" id="education-modal-title">Add Education</h3>
+            <form id="education-form" class="space-y-4">
+                <input type="hidden" id="education-id" value="">
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Organization/University/School *</label>
+                    <input type="text" id="education-org" class="input" placeholder="e.g. Harvard University" required>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Location</label>
+                    <input type="text" id="education-location" class="input" placeholder="e.g. Cambridge, MA">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Start Year *</label>
+                        <input type="number" id="education-start-year" class="input" placeholder="e.g. 2018" min="1950"
+                            max="2100" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">End Year</label>
+                        <input type="number" id="education-end-year" class="input"
+                            placeholder="e.g. 2022 (or leave empty for Present)" min="1950" max="2100">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary flex-1">Save</button>
+                    <button type="button" id="education-cancel" class="btn-secondary flex-1">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Experience Modal -->
+    <div id="experience-modal" class="modal hidden">
+        <div class="modal-panel max-w-2xl">
+            <h3 class="text-xl font-bold mb-4" id="experience-modal-title">Add Experience</h3>
+            <form id="experience-form" class="space-y-4">
+                <input type="hidden" id="experience-id" value="">
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Job Title *</label>
+                    <input type="text" id="experience-title" class="input" placeholder="e.g. Software Engineer"
+                        required>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Employment Type *</label>
+                    <select id="experience-employment-type" class="input" required>
+                        <option value="">Select Employment Type</option>
+                        <option value="FULL_TIME">Full-time</option>
+                        <option value="PART_TIME">Part-time</option>
+                        <option value="SELF_EMPLOYED">Self-employed</option>
+                        <option value="FREELANCE">Freelance</option>
+                        <option value="INTERNSHIP">Internship</option>
+                        <option value="TRAINEE">Trainee</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Company or Organization *</label>
+                    <input type="text" id="experience-company" class="input" placeholder="e.g. Google Inc." required>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Location</label>
+                    <input type="text" id="experience-location" class="input" placeholder="e.g. San Francisco, CA">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Start Date *</label>
+                        <input type="month" id="experience-start-date" class="input" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">End Date</label>
+                        <input type="month" id="experience-end-date" class="input"
+                            placeholder="Leave empty for Present">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Description</label>
+                    <textarea id="experience-description" rows="4" class="input"
+                        placeholder="Describe your role and responsibilities..."></textarea>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary flex-1">Save</button>
+                    <button type="button" id="experience-cancel" class="btn-secondary flex-1">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Script (Module) -->
+    <script type="module" src="./main.js"></script>
+</body>
+
+</html>

@@ -69,7 +69,7 @@ const ALL_EMOJIS = [
 ];
 
 export function initDirectMessages() {
-    if (!window.location.pathname.includes('/messages/')) return;
+    if (!window.location.pathname.includes('/direct_messages.html')) return;
 
     const threadsEl = document.getElementById('dm-threads');
     const messagesEl = document.getElementById('dm-messages');
@@ -182,7 +182,7 @@ export function initDirectMessages() {
 
         // Update header info
         titleEl.textContent = otherUser.display_name || otherUser.username;
-        titleEl.href = otherUser.profile_url || (`/u/${otherUser.username}/`);
+        titleEl.href = otherUser.profile_url || (`/public_profile.html?u=${otherUser.username}`);
         titleEl.setAttribute('target', '_blank');
         titleEl.classList.add('cursor-pointer', 'hover:underline', 'hover:text-cyan-400');
         titleEl.classList.remove('cursor-default');

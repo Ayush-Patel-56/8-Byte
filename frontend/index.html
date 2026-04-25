@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title>Happening Now - Login (Updated)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center relative p-4">
+
+    <!-- Background Layers -->
+    <div class="bg-fluid"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Main Layout -->
+    <div class="w-full max-w-6xl flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-24 z-10">
+
+        <!-- Logo Section -->
+        <div class="flex-shrink-0 mb-8 lg:mb-0">
+            <img src="./WhatsApp_Image_2025-11-18_at_9.07.27_PM-removebg-preview.png"
+                class="w-[525px] md:w-[575px] object-contain">
+
+        </div>
+
+        <!-- Login Card -->
+        <div class="w-full max-w-[600px] glass-card rounded-2xl p-8 md:p-10 lg:ml-6">
+
+            <h1 class="text-5xl font-black mb-8 tracking-tight">Happening now</h1>
+            <h2 class="text-2xl font-bold mb-8">Join today.</h2>
+
+            <div class="flex flex-col gap-3">
+
+                <!-- Google Button (Official Render) -->
+                <div id="google-btn-container" class="flex justify-center"></div>
+                <!-- <button id="google-btn" ... (Removed for reliability) -->
+
+                <!-- Apple Button -->
+                <div class="flex justify-center">
+                    <button id="apple-btn"
+                        class="w-[250px] flex items-center justify-center gap-2 bg-white text-black rounded-full h-[40px] px-4 hover:bg-gray-100 apple-button-effect font-bold text-sm">
+                        <i class="fab fa-apple text-xl"></i>
+                        Sign up with Apple
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 my-2">
+                    <div class="h-px bg-gray-700 flex-1"></div>
+                    <span class="text-sm text-gray-400">or</span>
+                    <div class="h-px bg-gray-700 flex-1"></div>
+                </div>
+
+                <!-- Create Account Button -->
+                <button id="create-email-btn"
+                    class="bg-[#00b4d8] text-white hover:bg-[#009ec4] apple-button-effect font-bold rounded-full py-3 px-4 text-sm sm:text-base">
+                    Create account with email
+                </button>
+
+                <p class="text-[11px] text-gray-400 leading-tight mt-1">
+                    By signing up, you agree to the
+                    <a class="text-[#00b4d8] hover:underline">Terms of Service</a>,
+                    <a class="text-[#00b4d8] hover:underline">Privacy Policy</a>,
+                    and
+                    <a class="text-[#00b4d8] hover:underline">Cookie Use</a>.
+                </p>
+
+                <div class="mt-10 mb-2">
+                    <p class="font-bold text-lg mb-3">Already have an account?</p>
+                    <button id="signin-btn"
+                        class="w-full border border-gray-600 text-[#00b4d8] hover:bg-[#00b4d8] hover:bg-opacity-10 hover:border-[#00b4d8] apple-button-effect font-bold rounded-full py-2.5 px-4 text-sm sm:text-base">
+                        Sign in
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-12 flex flex-wrap justify-center gap-x-4 gap-y-2 text-[12px] text-gray-500 z-10">
+        <a href="#" class="hover:underline">Terms of Service</a>
+        <a href="#" class="hover:underline">Privacy Policy</a>
+        <a href="#" class="hover:underline">Cookie Policy</a>
+        <p>© 2025 X Corp.</p>
+    </div>
+
+
+    <!-- SIGNUP POPUP -->
+    <div id="signup-modal" class="modal hidden">
+        <div class="modal-panel">
+            <h3 class="text-xl font-bold mb-4">Create an account</h3>
+            <form id="signup-form" class="space-y-3">
+                <div>
+                    <input name="username" placeholder="Username" class="input" required />
+                    <p id="username-error" class="text-red-400 text-xs mt-1 hidden">Username must be at least 3
+                        characters</p>
+                </div>
+                <input name="email" type="email" placeholder="Email" class="input" required />
+                <div>
+                    <div class="relative">
+                        <input id="signup-pass" name="password" type="password" placeholder="Password"
+                            class="input pr-10" required />
+                        <button type="button" id="toggle-signup-pass"
+                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <!-- Password Strength Indicator -->
+                    <div id="password-strength" class="mt-2 hidden">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
+                                <div id="strength-bar" class="h-full transition-all duration-300" style="width: 0%">
+                                </div>
+                            </div>
+                            <span id="strength-text" class="text-xs font-medium"></span>
+                        </div>
+                        <ul class="text-xs space-y-1">
+                            <li id="req-length" class="text-gray-400 flex items-center gap-2">
+                                <i class="fas fa-circle text-[6px]"></i>
+                                <span>At least 8 characters</span>
+                            </li>
+                            <li id="req-uppercase" class="text-gray-400 flex items-center gap-2">
+                                <i class="fas fa-circle text-[6px]"></i>
+                                <span>One uppercase letter</span>
+                            </li>
+                            <li id="req-number" class="text-gray-400 flex items-center gap-2">
+                                <i class="fas fa-circle text-[6px]"></i>
+                                <span>One number</span>
+                            </li>
+                            <li id="req-special" class="text-gray-400 flex items-center gap-2">
+                                <i class="fas fa-circle text-[6px]"></i>
+                                <span>One special character</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div>
+                    <div class="relative">
+                        <input id="signup-pass2" name="password2" type="password" placeholder="Confirm Password"
+                            class="input pr-10" required />
+                        <button type="button" id="toggle-signup-pass2"
+                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p id="password-match-error" class="text-red-400 text-xs mt-1 hidden">Passwords do not match</p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary">Create Account</button>
+                    <button type="button" id="signup-cancel" class="btn-secondary">Cancel</button>
+                </div>
+
+                <p id="signup-error" class="text-red-400 text-sm"></p>
+            </form>
+
+            <!-- OTP Form (Hidden initially) -->
+            <form id="otp-form" class="space-y-3 hidden">
+                <p class="text-sm text-gray-400 mb-4">We sent a verification code to <span id="otp-email-display"
+                        class="text-white font-bold"></span></p>
+                <input name="otp" placeholder="Enter 6-digit code"
+                    class="input text-center tracking-[0.5em] text-xl font-mono" maxlength="6" required />
+
+                <div class="flex gap-3 mt-4">
+                    <button type="submit" class="btn-primary">Verify</button>
+                    <!-- <button type="button" class="btn-secondary">Resend</button> -->
+                </div>
+                <p id="otp-error" class="text-red-400 text-sm"></p>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- SIGNIN POPUP -->
+    <div id="signin-modal" class="modal hidden">
+        <div class="modal-panel">
+            <h3 class="text-xl font-bold mb-4">Sign In</h3>
+            <form id="signin-form" class="space-y-3">
+                <input name="identifier" placeholder="Email or Username" class="input" required />
+
+                <div class="relative">
+                    <input id="signin-pass" name="password" type="password" placeholder="Password" class="input pr-10"
+                        required />
+                    <button type="button" id="toggle-signin-pass"
+                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary">Sign In</button>
+                    <button type="button" id="signin-cancel" class="btn-secondary">Cancel</button>
+                </div>
+
+                <p id="signin-error" class="text-red-400 text-sm"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Script (Module) -->
+    <script type="module" src="./main.js"></script>
+</body>
+
+</html>

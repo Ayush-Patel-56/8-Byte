@@ -1,4 +1,5 @@
-import { setButtonLoading, showToast } from './utils.js';
+import { setButtonLoading, showToast, API_BASE } from './utils.js';
+import { GOOGLE_CLIENT_ID } from './config.js';
 
 export function initAuth() {
     // -------------------------------------------------------------
@@ -10,8 +11,8 @@ export function initAuth() {
 
     if (signupModal && signinModal) {
 
-        // Back-end base URL (same origin)
-        const baseUrl = "";
+        // Back-end base URL — imported from utils.js
+        const baseUrl = API_BASE;
 
         // Buttons
         const createEmailBtn = document.getElementById("create-email-btn");
@@ -40,7 +41,7 @@ export function initAuth() {
 
             try {
                 // Send to backend
-                const res = await fetch("/api/auth/google/", {
+                const res = await fetch(`${API_BASE}/api/auth/google/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ token: response.credential }),
@@ -57,7 +58,7 @@ export function initAuth() {
 
                     // Redirect to dashboard
                     setTimeout(() => {
-                        window.location.assign(window.location.origin + '/dashboard/');
+                        window.location.assign('/dashboard.html');
                     }, 500);
                 } else {
                     console.error("Google Auth Backend Error:", data);
@@ -74,7 +75,7 @@ export function initAuth() {
         if (googleBtnContainer) {
             const initializeGoogle = () => {
                 if (window.google) {
-                    const CLIENT_ID = "715843950550-diqg03nmv5dh756r366q9gq33bpu778p.apps.googleusercontent.com";
+                    const CLIENT_ID = GOOGLE_CLIENT_ID;
 
                     window.google.accounts.id.initialize({
                         client_id: CLIENT_ID,
@@ -387,7 +388,7 @@ export function initAuth() {
                 localStorage.setItem("refresh", data.refresh);
 
                 console.log("Signup successful. Redirecting to dashboard...");
-                window.location.assign(window.location.origin + '/dashboard/');
+                window.location.assign('/dashboard.html');
 
             } catch (error) {
                 console.error("Signup error:", error);
@@ -434,7 +435,7 @@ export function initAuth() {
                     showToast("Account Verified!", "success");
 
                     setTimeout(() => {
-                        window.location.assign(window.location.origin + '/dashboard/');
+                        window.location.assign('/dashboard.html');
                     }, 500);
 
                 } catch (error) {
@@ -466,7 +467,7 @@ export function initAuth() {
             let loginUsername = identifier;
 
             if (identifier.includes("@")) {
-                const r = await fetch(`/api/resolve-username/?email=${encodeURIComponent(identifier)}`);
+                const r = await fetch(`${API_BASE}/api/resolve-username/?email=${encodeURIComponent(identifier)}`);
 
                 if (r.ok) {
                     const body = await r.json();
@@ -475,7 +476,7 @@ export function initAuth() {
             }
 
             try {
-                const res = await fetch(`/api/token/`, {
+                const res = await fetch(`${API_BASE}/api/token/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username: loginUsername, password }),
@@ -492,15 +493,14 @@ export function initAuth() {
                 localStorage.setItem("access", data.access);
                 localStorage.setItem("refresh", data.refresh);
 
-                const me = await fetch(`/api/me/`, {
+                const me = await fetch(`${API_BASE}/api/me/`, {
                     headers: { "Authorization": "Bearer " + data.access }
                 });
 
                 if (me.ok) {
                     const user = await me.json();
                     console.log("Login successful. Redirecting to dashboard...");
-                    // Keep loading state while redirecting
-                    window.location.assign(window.location.origin + '/dashboard/');
+                    window.location.assign('/dashboard.html');
                 } else {
                     err.textContent = "Failed to load user data.";
                     setButtonLoading(submitBtn, false);

@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Re-export API_BASE from config so all other modules import from utils.js
+// (no circular deps — config.js has no imports)
+// ─────────────────────────────────────────────────────────────────────────────
+export { API_BASE } from './config.js';
 
 // GLOBAL UTILITY: LOADING STATE MANAGEMENT
 export function setButtonLoading(button, isLoading) {
@@ -57,11 +62,17 @@ export function showToast(message, type = 'success') {
 // GLOBAL UTILITY: LOGOUT
 export const logout = () => {
     localStorage.clear();
-    window.location.href = '/';
+    window.location.href = '/index.html';
 };
 
 // GLOBAL UTILITY: AUTHENTICATED FETCH
+// Automatically prepends API_BASE to relative URLs (e.g. '/api/profile/' → full Azure URL)
 export async function authFetch(url, options = {}) {
+    // Resolve relative API paths to absolute Azure backend URL
+    if (url.startsWith('/')) {
+        url = API_BASE + url;
+    }
+
     let token = localStorage.getItem('access');
     if (!token) {
         logout();
@@ -70,7 +81,6 @@ export async function authFetch(url, options = {}) {
 
     // Inject Header
     options.headers = options.headers || {};
-    // Handle if headers is NOT a Headers object (simple object)
     if (!options.headers['Authorization']) {
         options.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -88,7 +98,7 @@ export async function authFetch(url, options = {}) {
         }
 
         try {
-            const refreshRes = await fetch('/api/token/refresh/', {
+            const refreshRes = await fetch(`${API_BASE}/api/token/refresh/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refresh })
