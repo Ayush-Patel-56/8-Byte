@@ -59,11 +59,15 @@ class MessageEncryption:
         """
         if not ciphertext:
             return ciphertext
+        # Fernet encrypted strings always start with 'gAAAAA'
+        # If it doesn't start with this, it's likely a legacy plaintext message
+        if not ciphertext.startswith('gAAAAA'):
+            return ciphertext
+
         try:
             cipher = MessageEncryption.get_cipher()
             return cipher.decrypt(ciphertext.encode()).decode()
         except Exception as e:
-            # If decryption fails (bad key, legacy text, missing env var), 
-            # return as-is to prevent 500 crashes
-            print(f"DECRYPTION ERROR: {e}")
+            # Only print if it actually looked like encrypted data but failed
+            print(f"DECRYPTION ERROR (Data Corrupted or Key Changed): {e}")
             return ciphertext

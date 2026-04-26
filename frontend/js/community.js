@@ -571,6 +571,8 @@ export function initCommunity() {
     async function startPolling() {
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = setInterval(loadMessages, 3000);
+        // Clean up timer when the user leaves the page
+        window.addEventListener('beforeunload', () => clearInterval(pollTimer), { once: true });
     }
 
     (async () => {

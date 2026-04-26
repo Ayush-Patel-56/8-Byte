@@ -4,6 +4,7 @@ from django.db.models import UniqueConstraint
 from django.utils.text import slugify
 from django.utils import timezone
 import random
+import uuid as _uuid
 
 class EmailOTP(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='otp')
@@ -22,7 +23,16 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     title = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True, default="This is my personal corner of the internet.")
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+
+    def _avatar_upload_path(instance, filename):
+        """Generate a unique per-user avatar path so no two users overwrite each other.
+        Result example: avatars/hritu/3f7a1b2c.jpg
+        """
+        ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'png'
+        unique_name = f"{_uuid.uuid4().hex[:12]}.{ext}"
+        return f"avatars/{instance.user.username}/{unique_name}"
+
+    avatar = models.ImageField(upload_to=_avatar_upload_path, blank=True, null=True)
     
     # Social Links
     def validate_instagram(value):

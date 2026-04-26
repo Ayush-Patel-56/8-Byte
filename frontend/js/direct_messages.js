@@ -213,7 +213,12 @@ export function initDirectMessages() {
             lastSeenEl.classList.add('text-green-400');
         } else {
             onlineDotNew.classList.add('hidden');
-            lastSeenEl.textContent = 'Last seen recently';
+            // Show real last seen time if available, otherwise generic fallback
+            if (otherUser.last_activity) {
+                lastSeenEl.textContent = `Last seen ${formatRelativeTime(otherUser.last_activity)}`;
+            } else {
+                lastSeenEl.textContent = 'Last seen recently';
+            }
             lastSeenEl.classList.remove('text-green-400');
             lastSeenEl.classList.add('text-gray-500');
         }
@@ -574,7 +579,11 @@ export function initDirectMessages() {
             });
         });
 
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        // Smart auto-scroll: only scroll to bottom if user is already near the bottom
+        const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
+        if (isNearBottom) {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
     }
 
     async function loadMessages() {
@@ -678,7 +687,7 @@ export function initDirectMessages() {
                 <div class="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition">
                     <div class="w-8 h-8 rounded-full overflow-hidden border border-white/10 shrink-0">${avatar}</div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-bold truncate">${u.display_name}</div>
+                        <div class="text-sm font-bold truncate">${u.display_name || u.username}</div>
                         <div class="text-xs text-gray-500 truncate">@${u.username}</div>
                     </div>
                     <button class="btn-secondary text-xs dm-start-btn" data-username="${u.username}">Message</button>

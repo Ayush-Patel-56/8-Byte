@@ -469,10 +469,15 @@ export function initAuth() {
             if (identifier.includes("@")) {
                 const r = await fetch(`${API_BASE}/api/resolve-username/?email=${encodeURIComponent(identifier)}`);
 
-                if (r.ok) {
-                    const body = await r.json();
-                    loginUsername = body.username;
+                if (!r.ok) {
+                    // Email not found in the system — stop here with a clear message
+                    err.textContent = "No account found with this email address.";
+                    setButtonLoading(submitBtn, false);
+                    return;
                 }
+
+                const body = await r.json();
+                loginUsername = body.username;
             }
 
             try {

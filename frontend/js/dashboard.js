@@ -119,9 +119,19 @@ export function initDashboard() {
 
                     if (data.avatar) avatarPreview.src = data.avatar;
 
-                    const publicUrl = `/public_profile.html?u=${data.username}`;
-                    console.log("Updating View Public Page link to:", publicUrl);
-                    viewPublicBtn.href = publicUrl;
+                    // Only enable share/view buttons once we have a valid username
+                    if (data.username) {
+                        const publicUrl = `/public_profile.html?u=${data.username}`;
+                        console.log("Updating View Public Page link to:", publicUrl);
+                        viewPublicBtn.href = publicUrl;
+                        viewPublicBtn.removeAttribute('disabled');
+                        viewPublicBtn.classList.remove('opacity-50', 'pointer-events-none');
+                        const shareBtn = document.getElementById('share-profile-btn');
+                        if (shareBtn) {
+                            shareBtn.removeAttribute('disabled');
+                            shareBtn.classList.remove('opacity-50', 'pointer-events-none');
+                        }
+                    }
                 } else {
                     console.error("Failed to load profile:", res.statusText);
                 }
@@ -225,13 +235,19 @@ export function initDashboard() {
                     // Upload as avatar
                     formData.append('avatar', blob, 'avatar.png');
 
-                    await authFetch('/api/profile/', {
+                    const avatarRes = await authFetch('/api/profile/', {
                         method: 'PATCH',
                         body: formData
                     });
 
-                    // Update avatar preview
-                    avatarPreview.src = URL.createObjectURL(blob);
+                    if (avatarRes.ok) {
+                        const data = await avatarRes.json();
+                        // Use the real server URL so the preview survives a page refresh
+                        avatarPreview.src = data.avatar || URL.createObjectURL(blob);
+                        showToast('Profile picture updated!', 'success');
+                    } else {
+                        showToast('Failed to upload profile picture.', 'error');
+                    }
                 } else if (cropperUploadType === 'gallery') {
                     // Upload as gallery photo
                     formData.append('image', blob, 'cropped.jpg');
@@ -294,7 +310,7 @@ export function initDashboard() {
             // Set loading state
             setButtonLoading(submitBtn, true);
 
-            await authFetch('/api/profile/', {
+            const res = await authFetch('/api/profile/', {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json'
@@ -302,13 +318,16 @@ export function initDashboard() {
                 body: JSON.stringify(payload)
             });
 
-            loadProfile();
-
             // Remove loading state
             setButtonLoading(submitBtn, false);
 
-            // Show success toast
-            showToast('Profile updated successfully!', 'success');
+            if (res.ok) {
+                await loadProfile();
+                showToast('Profile updated successfully!', 'success');
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast(err.detail || 'Failed to update profile.', 'error');
+            }
         });
 
         // Logout
@@ -374,63 +393,44 @@ export function initDashboard() {
             }
         }
 
-        // Photo Preview on File Select
-        photoInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const previewImg = document.getElementById('photo-preview-img');
-                    const placeholder = document.getElementById('photo-placeholder');
-                    const filenameP = document.getElementById('photo-filename');
-
-                    // Show preview, hide placeholder
-                    previewImg.src = event.target.result;
-                    previewImg.classList.remove('hidden');
-                    placeholder.classList.add('hidden');
-
-                    // Update filename if element exists
-                    if (filenameP) {
-                        filenameP.textContent = file.name;
-                    }
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Photo Input - Initialize Cropper Inside Upload Modal
+        // Photo Input - Initialize Cropper Inside Upload Modal (single unified listener)
         let photoCropper = null; // Separate cropper instance for gallery photos
 
         photoInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const previewImg = document.getElementById('photo-preview-img');
-                    const placeholder = document.getElementById('photo-placeholder');
+            if (!file) return;
 
-                    // Show preview image, hide placeholder
-                    previewImg.src = event.target.result;
-                    previewImg.classList.remove('hidden');
-                    placeholder.classList.add('hidden');
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const previewImg = document.getElementById('photo-preview-img');
+                const placeholder = document.getElementById('photo-placeholder');
+                const filenameP = document.getElementById('photo-filename');
 
-                    // Hide file input so it doesn't block cropper interaction
-                    photoInput.classList.add('hidden');
+                // Show preview image, hide placeholder
+                previewImg.src = event.target.result;
+                previewImg.classList.remove('hidden');
+                placeholder.classList.add('hidden');
 
-                    // Destroy previous cropper if exists
-                    if (photoCropper) {
-                        photoCropper.destroy();
-                    }
+                // Update filename if element exists
+                if (filenameP) filenameP.textContent = file.name;
 
-                    // Initialize cropper on the preview image (SAME as avatar cropper)
-                    photoCropper = new Cropper(previewImg, {
-                        aspectRatio: 1,
-                        viewMode: 1,
-                        dragMode: 'crop', // Drag crop box, not image
-                    });
-                };
-                reader.readAsDataURL(file);
-            }
+                // Hide file input so it doesn't block cropper interaction
+                photoInput.classList.add('hidden');
+
+                // Destroy previous cropper before creating a new one
+                if (photoCropper) {
+                    photoCropper.destroy();
+                    photoCropper = null;
+                }
+
+                // Initialize cropper on the preview image
+                photoCropper = new Cropper(previewImg, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    dragMode: 'crop',
+                });
+            };
+            reader.readAsDataURL(file);
         });
 
         // Upload Photo - Get Cropped Image
@@ -499,14 +499,20 @@ export function initDashboard() {
 
         // Delete Photo (Global function for onclick)
         window.deletePhoto = async (id) => {
-            await authFetch(`/api/photos/${id}/`, {
-                method: 'DELETE'
-            });
+            if (!confirm('Are you sure you want to delete this photo?')) return;
 
-            loadPhotos();
-
-            // Show success toast
-            showToast('Photo deleted successfully!', 'success');
+            try {
+                const res = await authFetch(`/api/photos/${id}/`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadPhotos();
+                    showToast('Photo deleted successfully!', 'success');
+                } else {
+                    showToast('Failed to delete photo. Please try again.', 'error');
+                }
+            } catch (err) {
+                console.error('Error deleting photo:', err);
+                showToast('Network error. Could not delete photo.', 'error');
+            }
         };
 
 

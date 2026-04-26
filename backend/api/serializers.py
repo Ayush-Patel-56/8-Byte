@@ -228,12 +228,18 @@ class DirectThreadSerializer(serializers.ModelSerializer):
                 from django.utils import timezone
                 is_online = timezone.now() - other.profile.last_activity < timedelta(minutes=5)
         
+        last_activity = None
+        if hasattr(other, 'profile') and other.profile:
+            if hasattr(other.profile, 'last_activity') and other.profile.last_activity:
+                last_activity = other.profile.last_activity.isoformat()
+        
         return {
             'username': other.username,
             'display_name': display_name,
             'avatar': avatar_url,
             'profile_url': f'/public_profile.html?u={other.username}',
             'is_online': is_online,
+            'last_activity': last_activity,
         }
 
     def get_last_message(self, obj):

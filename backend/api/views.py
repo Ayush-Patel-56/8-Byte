@@ -182,6 +182,20 @@ class ProfileDetailView(generics.RetrieveUpdateAPIView):
         # Return the profile of the currently logged-in user
         return self.request.user.profile
 
+    def update(self, request, *args, **kwargs):
+        profile = self.get_object()
+
+        # If a new avatar is being uploaded, delete the old one from S3 first
+        # to prevent orphaned files from accumulating in storage
+        if 'avatar' in request.FILES and profile.avatar:
+            try:
+                profile.avatar.delete(save=False)  # delete old file from S3
+            except Exception as e:
+                print(f"[WARN] Could not delete old avatar: {e}")
+
+        kwargs['partial'] = True  # Always treat as PATCH (partial update)
+        return super().update(request, *args, **kwargs)
+
 # -------------------------------------------------------------
 # GALLERY MANAGEMENT (UPLOAD / LIST / DELETE)
 # -------------------------------------------------------------
@@ -715,7 +729,10 @@ class CommunityMembersView(generics.ListCreateAPIView):
     def get_queryset(self):
         community = self._get_community()
         self._require_member(community)
-        return CommunityMembership.objects.filter(community=community).select_related('user', 'user__profile').order_by('user__username')
+        return CommunityMembership.objects.filter(
+            community=community, 
+            user__is_active=True
+        ).select_related('user', 'user__profile').order_by('user__username')
 
     def create(self, request, *args, **kwargs):
         community = self._get_community()
@@ -726,9 +743,9 @@ class CommunityMembersView(generics.ListCreateAPIView):
             return Response({'detail': 'username is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(username__iexact=username)
+            user = User.objects.get(username__iexact=username, is_active=True)
         except User.DoesNotExist:
-            return Response({'detail': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'detail': 'User not found or inactive'}, status=status.HTTP_404_NOT_FOUND)
 
         membership, created = CommunityMembership.objects.get_or_create(
             community=community,
@@ -807,9 +824,10 @@ class UserSearchView(generics.ListAPIView):
             return User.objects.none()
 
         # Search by username (case-insensitive, partial match)
-        # Exclude current user from results
+        # Exclude current user from results and only show active users
         return User.objects.filter(
-            username__icontains=query
+            username__icontains=query,
+            is_active=True
         ).exclude(
             id=self.request.user.id
         ).select_related('profile')[:10]  # Limit to 10 results
@@ -856,9 +874,9 @@ class DirectThreadListCreateView(generics.ListCreateAPIView):
             return Response({'detail': 'username is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            other = User.objects.get(username__iexact=username)
+            other = User.objects.get(username__iexact=username, is_active=True)
         except User.DoesNotExist:
-            return Response({'detail': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'detail': 'User not found or inactive'}, status=status.HTTP_404_NOT_FOUND)
 
         if other == request.user:
             return Response({'detail': 'Cannot message yourself'}, status=status.HTTP_400_BAD_REQUEST)
