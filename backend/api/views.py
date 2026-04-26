@@ -7,7 +7,7 @@ from homepage.models import EmailOTP
 
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
 
@@ -176,14 +176,27 @@ from .serializers import ProfileSerializer, UserPhotoSerializer, EducationSerial
 
 class ProfileDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = ProfileSerializer
-    permission_classes = [IsAuthenticated]
+    # Public reads allowed; write operations still require auth via update()
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_object(self):
-        # Return the profile of the currently logged-in user
+        # If a specific username is requested (public profile view), return that user's profile
+        username = self.request.query_params.get('username')
+        if username:
+            user = get_object_or_404(User, username__iexact=username, is_active=True)
+            return get_object_or_404(Profile, user=user)
+        # Otherwise return the logged-in user's own profile (dashboard edit)
+        if not self.request.user.is_authenticated:
+            from rest_framework.exceptions import NotAuthenticated
+            raise NotAuthenticated('Authentication required to view your own profile.')
         return self.request.user.profile
 
     def update(self, request, *args, **kwargs):
-        profile = self.get_object()
+        # Updates are always on the logged-in user's own profile only
+        if not request.user.is_authenticated:
+            from rest_framework.exceptions import NotAuthenticated
+            raise NotAuthenticated()
+        profile = request.user.profile
 
         # If a new avatar is being uploaded, delete the old one from S3 first
         # to prevent orphaned files from accumulating in storage
@@ -194,6 +207,8 @@ class ProfileDetailView(generics.RetrieveUpdateAPIView):
                 print(f"[WARN] Could not delete old avatar: {e}")
 
         kwargs['partial'] = True  # Always treat as PATCH (partial update)
+        # Force get_object to return the logged-in user's own profile during update
+        self.kwargs.pop('username', None)
         return super().update(request, *args, **kwargs)
 
 # -------------------------------------------------------------
@@ -201,9 +216,18 @@ class ProfileDetailView(generics.RetrieveUpdateAPIView):
 # -------------------------------------------------------------
 class UserPhotoListCreateView(generics.ListCreateAPIView):
     serializer_class = UserPhotoSerializer
-    permission_classes = [IsAuthenticated]
+    # Allow unauthenticated users to view photos on public profiles
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
+        # If a specific username is requested (public profile view), return that user's photos
+        username = self.request.query_params.get('username')
+        if username:
+            return UserPhoto.objects.filter(
+                user__username__iexact=username,
+                user__is_active=True
+            ).order_by('-created_at')
+        # Otherwise return the logged-in user's own photos
         return UserPhoto.objects.filter(user=self.request.user).order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
@@ -449,9 +473,7 @@ class SkillDetailView(generics.DestroyAPIView):
 # -------------------------------------------------------------
 # LIKE FEATURE
 # -------------------------------------------------------------
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 
-# ... (Previous imports remain, ensuring IsAuthenticatedOrReadOnly is available)
 
 # -------------------------------------------------------------
 # LIKE FEATURE

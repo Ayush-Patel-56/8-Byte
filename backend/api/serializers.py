@@ -268,11 +268,18 @@ class DirectThreadSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
+    # display_name is a @property on the Profile model — expose it for public profile pages
+    display_name = serializers.SerializerMethodField()
+
+    def get_display_name(self, obj):
+        return obj.display_name  # calls the @property on Profile model
 
     class Meta:
         model = Profile
-        fields = ['username', 'email', 'title', 'description', 'avatar', 'instagram', 'linkedin', 'github', 'gmail', 'gender']
+        # email is intentionally excluded to prevent privacy leaks on public profile reads.
+        # The user controls their contact info via the 'gmail' field.
+        fields = ['username', 'display_name', 'title', 'description', 'avatar',
+                  'instagram', 'linkedin', 'github', 'gmail', 'gender']
 
 class EducationSerializer(serializers.ModelSerializer):
     class Meta:
