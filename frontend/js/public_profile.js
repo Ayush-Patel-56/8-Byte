@@ -102,7 +102,7 @@ export function initPublicProfile() {
             const lbCaptionUsername = document.getElementById('lightbox-caption-username');
             const avatarHTML = data.avatar
                 ? `<img src="${data.avatar}" class="w-full h-full object-cover">`
-                : `<div class="w-full h-full bg-blue-500 flex items-center justify-center text-xs font-bold">${USERNAME[0].toUpperCase()}</div>`;
+                : `<div class="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold">${USERNAME[0].toUpperCase()}</div>`;
             if (lbAvatar) lbAvatar.innerHTML = avatarHTML;
             if (lbUsername) lbUsername.textContent = data.username || USERNAME;
             if (lbCaptionAvatar) lbCaptionAvatar.innerHTML = `<div class="w-full h-full rounded-full overflow-hidden">${avatarHTML}</div>`;
@@ -140,6 +140,78 @@ export function initPublicProfile() {
         }
     }
     loadGallery();
+    
+    // --- Load Education ---
+    async function loadEducation() {
+        try {
+            const res = await fetch(api(`/api/education/?username=${USERNAME}`));
+            if (!res.ok) return;
+            const data = await res.json();
+            const section = document.getElementById('education-section');
+            const list = document.getElementById('education-list-public');
+            if (data.length > 0 && list) {
+                list.innerHTML = data.map(item => `
+                    <div class="border-l-2 border-cyan-500/30 pl-4 py-1">
+                        <h4 class="font-bold text-white">${item.organization}</h4>
+                        <p class="text-sm text-gray-400">${item.location || ''}</p>
+                        <p class="text-xs text-cyan-400 mt-1">${item.start_year} — ${item.end_year || 'Present'}</p>
+                    </div>
+                `).join('');
+                section.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error('Failed to load education:', err);
+        }
+    }
+    loadEducation();
+
+    // --- Load Experience ---
+    async function loadExperience() {
+        try {
+            const res = await fetch(api(`/api/experience/?username=${USERNAME}`));
+            if (!res.ok) return;
+            const data = await res.json();
+            const section = document.getElementById('experience-section');
+            const list = document.getElementById('experience-list-public');
+            if (data.length > 0 && list) {
+                list.innerHTML = data.map(item => `
+                    <div class="border-l-2 border-blue-500/30 pl-4 py-1">
+                        <h4 class="font-bold text-white">${item.title}</h4>
+                        <p class="text-sm text-blue-400">${item.company}</p>
+                        <p class="text-xs text-gray-500 mb-2">${item.location || ''}</p>
+                        <p class="text-xs text-gray-400">${new Date(item.start_date).getFullYear()} — ${item.end_date ? new Date(item.end_date).getFullYear() : 'Present'}</p>
+                        <p class="text-sm text-gray-300 mt-2">${item.description || ''}</p>
+                    </div>
+                `).join('');
+                section.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error('Failed to load experience:', err);
+        }
+    }
+    loadExperience();
+
+    // --- Load Skills ---
+    async function loadSkills() {
+        try {
+            const res = await fetch(api(`/api/skills/?username=${USERNAME}`));
+            if (!res.ok) return;
+            const data = await res.json();
+            const section = document.getElementById('skills-section');
+            const list = document.getElementById('skills-list-public');
+            if (data.length > 0 && list) {
+                list.innerHTML = data.map(item => `
+                    <span class="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm font-medium text-gray-300">
+                        ${item.name}
+                    </span>
+                `).join('');
+                section.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error('Failed to load skills:', err);
+        }
+    }
+    loadSkills();
 
     function setupGalleryListeners() {
         document.querySelectorAll('.gallery-item').forEach(item => {

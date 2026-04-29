@@ -173,6 +173,8 @@ def me_view(request):
 # -------------------------------------------------------------
 from homepage.models import Profile, UserPhoto, Education, Experience, Skill
 from .serializers import ProfileSerializer, UserPhotoSerializer, EducationSerializer, ExperienceSerializer, SkillSerializer
+from .s3_utils import upload_to_s3, delete_from_s3
+import uuid
 
 class ProfileDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = ProfileSerializer
@@ -195,17 +197,49 @@ class ProfileDetailView(generics.RetrieveUpdateAPIView):
         return self.request.user.profile
 
     def update(self, request, *args, **kwargs):
-        # get_object() already ensures we only get the logged-in user's profile for PATCH
         profile = self.get_object()
+        
+        # If a new avatar is being uploaded
+        if 'avatar' in request.FILES:
+            avatar_file = request.FILES['avatar']
+            # Generate unique path: avatars/<username>/<uuid>.hex.ext
+            ext = avatar_file.name.rsplit('.', 1)[-1].lower() if '.' in avatar_file.name else 'png'
+            file_path = f"avatars/{profile.user.username}/{uuid.uuid4().hex[:12]}.{ext}"
+            
+            # Use unified helper for upload
+            avatar_url = upload_to_s3(avatar_file, file_path)
+            if not avatar_url:
+                return Response({"detail": "Failed to upload avatar to storage."}, status=500)
+            
+            # Update the profile object
+            profile.avatar.name = file_path
+            profile.save()
+            
+            # The signal (homepage.signals) will automatically detect the change 
+            # and delete the old S3 file if it exists.
+            
+            # CRITICAL: Remove avatar from request data/files so super().update() 
+            # doesn't try to process it again (which causes the 400 error)
+            if 'avatar' in request.data:
+                if hasattr(request.data, '_mutable'):
+                    request.data._mutable = True
+                request.data.pop('avatar', None)
+            if 'avatar' in request.FILES:
+                request.FILES.pop('avatar', None)
 
-        # If a new avatar is being uploaded, delete the old one from S3 first
-        if 'avatar' in request.FILES and profile.avatar:
-            try:
-                profile.avatar.delete(save=False)
-            except Exception as e:
-                print(f"[WARN] Could not delete old avatar: {e}")
+        # Handle avatar removal via PATCH with avatar: null or empty
+        elif 'avatar' in request.data and (request.data['avatar'] is None or request.data['avatar'] == ''):
+            profile.avatar = None
+            profile.save()
+            # The signal will handle the physical S3 deletion
+            
+            # Remove from data to avoid serializer validation issues
+            if hasattr(request.data, '_mutable'):
+                request.data._mutable = True
+            request.data.pop('avatar', None)
 
-        kwargs['partial'] = True  # Always treat as PATCH
+        # Handle other fields
+        kwargs['partial'] = True
         return super().update(request, *args, **kwargs)
 
 # -------------------------------------------------------------
@@ -237,67 +271,22 @@ class UserPhotoListCreateView(generics.ListCreateAPIView):
         image_file = serializer.validated_data['image']
         caption = serializer.validated_data.get('caption', '')
         
-        # 3. Manual Boto3 Upload (Bypass Storage Backend)
-        import boto3
-        from botocore.config import Config
-        from django.conf import settings
+        # 3. Manual S3 Upload via Unified Helper
+        file_path = f"gallery/{request.user.username}/{uuid.uuid4().hex[:12]}_{image_file.name}"
         
-        bucket_name = settings.AWS_STORAGE_BUCKET_NAME
-        file_path = f"gallery/{image_file.name}" # Define path manually
-        
-        upload_success = False
-        last_error = ""
+        image_url = upload_to_s3(image_file, file_path)
+        if not image_url:
+            return Response({"detail": "Upload Failed: Storage backend error."}, status=500)
 
-        # S3 Client Configuration
-        # We try multiple region configurations to account for Supabase quirks
-        regions_to_try = ['ap-southeast-1', 'us-east-1']
-        
-        for region in regions_to_try:
-            try:
-                print(f"DEBUG: Attempting upload to region {region}...")
-                s3_client = boto3.client(
-                    's3',
-                    endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-                    region_name=region,
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID.strip() if settings.AWS_ACCESS_KEY_ID else None,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY.strip() if settings.AWS_SECRET_ACCESS_KEY else None,
-                    config=Config(signature_version='s3v4')
-                )
-                
-                # Reset file pointer just in case
-                image_file.seek(0)
-                
-                s3_client.put_object(
-                    Bucket=bucket_name,
-                    Key=file_path,
-                    Body=image_file.read()
-                    # Removed ACL and ContentType to avoid Signature Mismatches if Supabase strips them
-                )
-                upload_success = True
-                print(f"DEBUG: Upload SUCCESS with region {region}")
-                break # Stop if success
-            except Exception as e:
-                print(f"DEBUG: Upload failed with region {region}: {e}")
-                last_error = str(e)
-
-        if not upload_success:
-             return Response({"detail": f"Upload Failed (S3): {last_error}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # 4. Save to Database (Image path string only)
-        # We manually create the object to avoid Model.save() triggering another upload
+        # 4. Save to Database
         photo = UserPhoto(
             user=request.user,
             caption=caption
         )
-        # Manually set the name field (avoids storage backend upload)
         photo.image.name = file_path 
         photo.save()
         
-        # Return standard response
         return Response(UserPhotoSerializer(photo, context={'request': request}).data, status=status.HTTP_201_CREATED)
-
-    def perform_create(self, serializer):
-        pass # Not used anymore since we override create()
 
 class UserPhotoDetailView(generics.DestroyAPIView):
     queryset = UserPhoto.objects.all()
@@ -308,9 +297,9 @@ class UserPhotoDetailView(generics.DestroyAPIView):
         # Ensure user can only delete their own photos
         return UserPhoto.objects.filter(user=self.request.user)
 
-# -------------------------------------------------------------
-# DEBUG S3 CONNECTION
-# -------------------------------------------------------------
+    def perform_destroy(self, instance):
+        # Automated cleanup is now handled by homepage.signals.delete_photo_on_gallery_delete
+        instance.delete()
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def debug_s3_connection(request):
@@ -608,10 +597,10 @@ def google_auth(request):
         # Check if user exists
         try:
             user = User.objects.get(email__iexact=email)
+            profile = user.profile
         except User.DoesNotExist:
             # Create new user
             username = email.split('@')[0]
-            # Ensure unique username
             base_username = username
             counter = 1
             while User.objects.filter(username__iexact=username).exists():
@@ -619,16 +608,36 @@ def google_auth(request):
                 counter += 1
             
             user = User.objects.create_user(username=username, email=email)
-            user.set_unusable_password() # No password needed for OAuth users
+            user.set_unusable_password()
             user.save()
             
             # Create Profile
             display_name = name if name else username
-            Profile.objects.create(
+            profile = Profile.objects.create(
                 user=user,
                 title=f"{display_name}'s Profile",
                 description=f"Hello this is {display_name}."
             )
+        
+        # Sync Google Profile Picture (For both NEW and EXISTING users)
+        # We only do this if they don't have an avatar yet, or you can force it
+        if not profile.avatar:
+            google_pic_url = idinfo.get('picture')
+            if google_pic_url:
+                try:
+                    import requests
+                    from django.core.files.base import ContentFile
+                    response = requests.get(google_pic_url)
+                    if response.status_code == 200:
+                        file_name = f"google_avatar_{uuid.uuid4().hex[:8]}.jpg"
+                        file_path = f"avatars/{user.username}/{file_name}"
+                        # Upload to S3 using our helper
+                        s3_url = upload_to_s3(ContentFile(response.content, name=file_name), file_path)
+                        if s3_url:
+                            profile.avatar.name = file_path
+                            profile.save()
+                except Exception as e:
+                    print(f"[ERROR] Failed to save Google avatar: {e}")
 
         # Generate JWT
         refresh = RefreshToken.for_user(user)

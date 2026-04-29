@@ -118,9 +118,11 @@
 
                 <!-- Avatar Upload -->
                 <div class="flex items-center gap-6">
-                    <div class="relative group">
-                        <img id="avatar-preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Crect width='100%25' height='100%25' fill='%23222'/%3E%3C/svg%3E"
-                            class="w-24 h-24 rounded-full object-cover border-2 border-white/20">
+                    <div class="relative group w-24 h-24">
+                        <div id="avatar-placeholder" class="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-3xl font-bold border-2 border-white/20">
+                            ?
+                        </div>
+                        <img id="avatar-preview" src="" class="w-24 h-24 rounded-full object-cover border-2 border-white/20 hidden">
                         <label for="avatar-input"
                             class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition">
                             <i class="fas fa-camera text-white"></i>
@@ -129,7 +131,12 @@
                     </div>
                     <div>
                         <h3 class="font-bold text-lg">Profile Picture</h3>
-                        <p class="text-sm text-gray-400">Click the image to upload a new one.</p>
+                        <div class="flex flex-col gap-1">
+                            <p class="text-sm text-gray-400">Click the image to upload a new one.</p>
+                            <button type="button" id="remove-avatar-btn" class="text-xs text-red-400 hover:text-red-300 w-fit hidden">
+                                <i class="fas fa-trash-alt mr-1"></i> Remove Photo
+                            </button>
+                        </div>
                     </div>
                 </div>
 

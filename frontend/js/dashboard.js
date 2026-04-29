@@ -19,7 +19,12 @@ export function initDashboard() {
         const gmailInput = document.getElementById('gmail-input');
         const genderInput = document.getElementById('gender-input');
 
+        const avatarPlaceholder = document.getElementById('avatar-placeholder');
         const avatarPreview = document.getElementById('avatar-preview');
+        const removeAvatarBtn = document.getElementById('remove-avatar-btn');
+
+        if (!avatarPlaceholder) console.warn("Warning: #avatar-placeholder not found in DOM");
+        if (!avatarPreview) console.warn("Warning: #avatar-preview not found in DOM");
         const avatarInput = document.getElementById('avatar-input');
         const galleryGrid = document.getElementById('gallery-grid');
         const viewPublicBtn = document.getElementById('view-public-btn');
@@ -117,7 +122,22 @@ export function initDashboard() {
                     if (gmailInput) gmailInput.value = data.gmail || '';
                     if (genderInput) genderInput.value = data.gender || '';
 
-                    if (data.avatar) avatarPreview.src = data.avatar;
+                    if (data.username && avatarPlaceholder) {
+                        avatarPlaceholder.textContent = data.username[0].toUpperCase();
+                    }
+
+                    if (data.avatar) {
+                        if (avatarPreview) {
+                            avatarPreview.src = data.avatar;
+                            avatarPreview.classList.remove('hidden');
+                        }
+                        if (avatarPlaceholder) avatarPlaceholder.classList.add('hidden');
+                        if (removeAvatarBtn) removeAvatarBtn.classList.remove('hidden');
+                    } else {
+                        if (avatarPreview) avatarPreview.classList.add('hidden');
+                        if (avatarPlaceholder) avatarPlaceholder.classList.remove('hidden');
+                        if (removeAvatarBtn) removeAvatarBtn.classList.add('hidden');
+                    }
 
                     // Only enable share/view buttons once we have a valid username
                     if (data.username) {
@@ -228,7 +248,14 @@ export function initDashboard() {
             // Set loading state
             setButtonLoading(saveBtn, true);
 
-            cropper.getCroppedCanvas().toBlob(async (blob) => {
+            const canvas = cropper.getCroppedCanvas();
+            if (!canvas) {
+                showToast('Could not process image. Please try another one.', 'error');
+                setButtonLoading(saveBtn, false);
+                return;
+            }
+
+            canvas.toBlob(async (blob) => {
                 const formData = new FormData();
 
                 if (cropperUploadType === 'avatar') {
@@ -243,7 +270,12 @@ export function initDashboard() {
                     if (avatarRes.ok) {
                         const data = await avatarRes.json();
                         // Use the real server URL so the preview survives a page refresh
-                        avatarPreview.src = data.avatar || URL.createObjectURL(blob);
+                        if (data.avatar) {
+                            avatarPreview.src = data.avatar;
+                            avatarPreview.classList.remove('hidden');
+                            avatarPlaceholder.classList.add('hidden');
+                            removeAvatarBtn.classList.remove('hidden');
+                        }
                         showToast('Profile picture updated!', 'success');
                     } else {
                         showToast('Failed to upload profile picture.', 'error');
@@ -278,7 +310,33 @@ export function initDashboard() {
             });
         });
 
-        // Update Profile (Text Only)
+        if (removeAvatarBtn) {
+        removeAvatarBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to remove your profile picture?')) return;
+            
+            try {
+                const res = await authFetch('/api/profile/', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ avatar: null })
+                });
+                
+                if (res.ok) {
+                    avatarPreview.classList.add('hidden');
+                    avatarPlaceholder.classList.remove('hidden');
+                    removeAvatarBtn.classList.add('hidden');
+                    showToast('Profile picture removed', 'success');
+                } else {
+                    showToast('Failed to remove profile picture', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('An error occurred', 'error');
+            }
+        });
+    }
+
+    // Update Profile (Text Only)
         document.getElementById('profile-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
