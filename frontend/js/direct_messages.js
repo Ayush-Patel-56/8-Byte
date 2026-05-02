@@ -92,6 +92,17 @@ export function initDirectMessages() {
     let selectedOtherUser = null;
     let pollTimer = null;
     let searchTimer = null;
+    let lastCallIdSeen = null; // Track the latest call we've notified for
+    let isCallActive = false; // Track if we are currently in an active call modal
+
+    // Incoming Call Elements
+    const incomingModal = document.getElementById('incoming-call-modal');
+    const incomingName = document.getElementById('incoming-caller-name');
+    const incomingAvatar = document.getElementById('incoming-avatar');
+    const incomingType = document.getElementById('incoming-call-type');
+    const ringtone = document.getElementById('ringtone-audio');
+    const btnAccept = document.getElementById('btn-accept-call');
+    const btnDecline = document.getElementById('btn-decline-call');
 
     function setSelectedThreadFromStorage() {
         const saved = localStorage.getItem('selected_dm_thread_id');
@@ -124,10 +135,12 @@ export function initDirectMessages() {
             if (!selectedThreadId) return;
             try {
                 // 1. Join the room (Video Mode)
+                isCallActive = true;
                 await callManager.startCall(selectedThreadId, true);
                 // 2. Send the signaling message
                 await sendMessage(`📞 Started a video call`);
             } catch (err) {
+                isCallActive = false;
                 console.error("Call failed", err);
                 showToast(err.message || "Failed to start call", "error");
             }
@@ -140,10 +153,12 @@ export function initDirectMessages() {
             if (!selectedThreadId) return;
             try {
                 // 1. Join the room (Audio Mode)
+                isCallActive = true;
                 await callManager.startCall(selectedThreadId, false);
                 // 2. Send the signaling message
                 await sendMessage(`📞 Started a voice call`);
             } catch (err) {
+                isCallActive = false;
                 console.error("Voice Call failed", err);
                 showToast(err.message || "Failed to start voice call", "error");
             }
@@ -154,13 +169,49 @@ export function initDirectMessages() {
 
     // Wiring up Call End message
     callManager.onCallEnd = async (reason) => {
+        isCallActive = false; // Reset global call state
         // Only the person who clicks 'End' (local) sends the message.
-        // If the call ended because the remote user left, we don't send another signal
-        // because they already sent one or we just want to close quietly.
         if (selectedThreadId && reason === 'local') {
             await sendMessage("🚫 Call ended");
         }
     };
+
+    function showIncomingCall(caller, threadId, isVideo) {
+        if (isCallActive) return; // Don't interrupt if already in a call
+        
+        incomingName.textContent = caller.display_name || caller.username;
+        incomingType.textContent = isVideo ? "Video Call" : "Voice Call";
+        
+        const firstLetter = (caller.username?.[0] || '?').toUpperCase();
+        incomingAvatar.innerHTML = caller.avatar 
+            ? `<img src="${caller.avatar}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-2xl">${firstLetter}</div>`;
+        
+        incomingModal.classList.remove('hidden');
+        ringtone.play().catch(e => console.warn("Autoplay blocked:", e));
+
+        btnAccept.onclick = async () => {
+            stopRinging();
+            isCallActive = true;
+            try {
+                await callManager.startCall(threadId, isVideo);
+            } catch (err) {
+                isCallActive = false;
+                showToast(err.message, "error");
+            }
+        };
+
+        btnDecline.onclick = () => {
+            stopRinging();
+            // Just close. We don't send a message here so we don't spam the chat.
+        };
+    }
+
+    function stopRinging() {
+        incomingModal.classList.add('hidden');
+        ringtone.pause();
+        ringtone.currentTime = 0;
+    }
 
     function setHeader(otherUser) {
         const headerAvatar = document.getElementById('dm-header-avatar');
@@ -734,13 +785,39 @@ export function initDirectMessages() {
     async function startPolling() {
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = setInterval(async () => {
-            // Refresh messages in current conversation
+            // 1. Refresh threads list
+            const res = await authFetch('/api/dm/threads/');
+            if (!res.ok) return;
+            const threads = await res.json();
+            renderThreads(threads);
+
+            // 2. Check for NEW incoming calls in ANY thread
+            for (const t of threads) {
+                const msg = t.last_message;
+                if (!msg) continue;
+
+                // If message is from the other user AND it's a "Started a call" signal
+                if (msg.username !== localStorage.getItem('username') && msg.text.startsWith('📞 Started a')) {
+                    // If this is a new call ID we haven't seen yet
+                    if (msg.id > (lastCallIdSeen || 0)) {
+                        lastCallIdSeen = msg.id;
+                        const isVideo = msg.text.includes('video');
+                        showIncomingCall(t.other_user, t.id, isVideo);
+                    }
+                }
+            }
+
+            // 3. Refresh messages in current conversation
             if (selectedThreadId) {
                 await loadMessages();
+                // Update header info if needed
+                const current = threads.find(t => t.id === selectedThreadId);
+                if (current) {
+                    selectedOtherUser = current.other_user;
+                    setHeader(selectedOtherUser);
+                }
             }
-            // Also refresh thread list to update unread counts
-            await loadThreads(false);
-        }, 1000); // 1 second for near real-time updates
+        }, 2000); // 2 seconds to reduce server load but still feel "live"
     }
 
     (async () => {

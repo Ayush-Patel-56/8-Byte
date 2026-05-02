@@ -14,6 +14,82 @@
         if (!localStorage.getItem('access')) window.location.href = '/index.html';
     </script>
     <style>
+        /* Ringing Animation */
+        @keyframes ring-pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .ring-animation { animation: ring-pulse 1.5s infinite; }
+
+        /* Minimized Call Styles */
+        #call-modal.call-minimized {
+            background: transparent;
+            pointer-events: none;
+        }
+        #call-modal.call-minimized #modal-content {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 320px;
+            height: 180px;
+            aspect-ratio: 16/9;
+            pointer-events: auto;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 2px border-cyan-500/50;
+            overflow: hidden;
+            border-radius: 16px;
+        }
+        #call-modal.call-minimized #call-controls {
+            padding: 8px;
+            gap: 12px;
+            height: auto;
+            bottom: 10px;
+        }
+        #call-modal.call-minimized #call-controls button {
+            width: 36px;
+            height: 36px;
+        }
+        #call-modal.call-minimized #call-controls i {
+            font-size: 14px;
+        }
+        #call-modal.call-minimized #video-local-container {
+            width: 80px;
+            height: 60px;
+            bottom: 4px;
+            right: 4px;
+        }
+        #call-modal.call-minimized #call-status-container {
+            display: none;
+        }
+    </style>
+
+    <!-- Ringtone Audio -->
+    <audio id="ringtone-audio" loop>
+        <source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden">
+        <div class="glass-card w-80 p-8 rounded-3xl border border-white/20 text-center shadow-2xl">
+            <div class="relative w-24 h-24 mx-auto mb-6">
+                <div id="incoming-avatar" class="w-24 h-24 rounded-full overflow-hidden border-4 border-green-500 ring-animation">
+                    <!-- Avatar injected by JS -->
+                </div>
+            </div>
+            <h3 id="incoming-caller-name" class="text-xl font-bold text-white mb-1">Incoming Call...</h3>
+            <p id="incoming-call-type" class="text-gray-400 text-sm mb-8">Video Call</p>
+            
+            <div class="flex justify-center gap-6">
+                <button id="btn-decline-call" class="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition shadow-lg shadow-red-500/20">
+                    <i class="fas fa-phone-slash text-xl"></i>
+                </button>
+                <button id="btn-accept-call" class="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition shadow-lg shadow-green-500/20">
+                    <i class="fas fa-phone text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </div>
         /* Ensure Agora Video fits within container */
         #video-remote-container video {
             object-fit: contain !important;
@@ -120,11 +196,13 @@
                         class="flex flex-col w-full h-full md:block md:relative md:w-full md:max-w-6xl md:aspect-video md:bg-gray-900 md:rounded-2xl md:overflow-hidden md:border md:border-white/10 md:shadow-2xl">
 
                         <!-- 1. STATUS (Absolute Top Left - Works in both modes) -->
-                        <div
+                        <div id="call-status-container"
                             class="absolute top-5 left-4 z-40 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
                             <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                             <!-- JS updates this text -->
                             <div id="call-status" class="text-white text-xs font-medium">Connecting...</div>
+                            <div class="h-4 w-px bg-white/20 mx-1"></div>
+                            <div id="call-timer" class="text-white text-xs font-mono opacity-80">00:00</div>
                             <!-- Shim for Mobile Status JS if needed -->
                             <span id="call-status-text-mobile" class="hidden"></span>
                         </div>
@@ -140,8 +218,18 @@
                         <!-- Mobile: Middle of Flex Column (Order 2). Desktop: Full Background (Absolute Inset). -->
                         <div id="video-remote-container"
                             class="order-2 flex-1 w-full bg-black relative md:absolute md:inset-0 md:z-10 flex items-center justify-center">
+                            <!-- Voice Visualizer (Hidden by default) -->
+                            <div id="voice-visualizer" class="hidden absolute inset-0 flex items-center justify-center bg-gray-900/50">
+                                <div class="flex items-end gap-1 h-20">
+                                    <div class="w-2 bg-cyan-500 rounded-full animate-bounce" style="animation-duration: 0.8s"></div>
+                                    <div class="w-2 bg-cyan-400 rounded-full animate-bounce" style="animation-duration: 0.5s"></div>
+                                    <div class="w-2 bg-cyan-300 rounded-full animate-bounce" style="animation-duration: 1.2s"></div>
+                                    <div class="w-2 bg-cyan-400 rounded-full animate-bounce" style="animation-duration: 0.7s"></div>
+                                    <div class="w-2 bg-cyan-500 rounded-full animate-bounce" style="animation-duration: 0.9s"></div>
+                                </div>
+                            </div>
                             <!-- Placeholder -->
-                            <div class="flex flex-col items-center justify-center text-gray-500">
+                            <div id="remote-placeholder" class="flex flex-col items-center justify-center text-gray-500">
                                 <div
                                     class="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-3 animate-pulse">
                                     <i class="fas fa-user-circle text-4xl opacity-50"></i>
@@ -171,6 +259,13 @@
                             <button id="btn-toggle-cam"
                                 class="w-14 h-14 md:w-12 md:h-12 rounded-full bg-gray-800 md:bg-white/10 text-white flex items-center justify-center border border-white/10 md:border-0 hover:bg-white/20 active:scale-95 transition">
                                 <i class="fas fa-video text-xl"></i>
+                            </button>
+
+                            <!-- Minimize -->
+                            <button id="btn-minimize-call"
+                                class="w-14 h-14 md:w-12 md:h-12 rounded-full bg-gray-800 md:bg-white/10 text-white flex items-center justify-center border border-white/10 md:border-0 hover:bg-white/20 active:scale-95 transition"
+                                title="Minimize Call">
+                                <i class="fas fa-compress-alt text-xl"></i>
                             </button>
                         </div>
 

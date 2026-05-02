@@ -29,6 +29,14 @@ export class CallManager {
         this.btnMic = document.getElementById('btn-toggle-mic');
         this.btnCam = document.getElementById('btn-toggle-cam');
         this.btnEnd = document.getElementById('btn-end-call');
+        this.btnMinimize = document.getElementById('btn-minimize-call');
+        this.timerEl = document.getElementById('call-timer');
+        this.visualizerEl = document.getElementById('voice-visualizer');
+        this.remotePlaceholder = document.getElementById('remote-placeholder');
+
+        this.callTimer = null;
+        this.startTime = null;
+        this.isMinimized = false;
 
         this.setupEventListeners();
     }
@@ -37,6 +45,7 @@ export class CallManager {
         this.btnEnd.onclick = () => this.leaveCall();
         this.btnMic.onclick = () => this.toggleMic();
         this.btnCam.onclick = () => this.toggleCam();
+        if (this.btnMinimize) this.btnMinimize.onclick = () => this.toggleMinimize();
 
         // Callbacks
         this.onCallEnd = null;
@@ -110,6 +119,15 @@ export class CallManager {
             }
 
             this.updateStatus("Connected. Waiting for others...");
+            this.startTimer();
+
+            // Handle Voice Visualizer
+            if (!isVideo) {
+                if (this.visualizerEl) this.visualizerEl.classList.remove('hidden');
+                if (this.remotePlaceholder) this.remotePlaceholder.classList.add('hidden');
+            } else {
+                if (this.visualizerEl) this.visualizerEl.classList.add('hidden');
+            }
 
         } catch (error) {
             console.error("Join error:", error);
@@ -148,6 +166,8 @@ export class CallManager {
             user.videoTrack.play(remotePlayerContainer);
 
             this.updateStatus("Connected");
+            if (this.visualizerEl) this.visualizerEl.classList.add('hidden');
+            if (this.remotePlaceholder) this.remotePlaceholder.classList.add('hidden');
         }
 
         if (mediaType === 'audio') {
@@ -176,6 +196,11 @@ export class CallManager {
             }
         }
         // If audio is unpublished, we don't need to remove the video container
+        
+        // Show visualizer if remote video is gone and we are in a call
+        if (this.remoteContainer.querySelectorAll('video').length === 0) {
+            if (this.visualizerEl) this.visualizerEl.classList.remove('hidden');
+        }
     }
 
     async handleUserLeft(user) {
@@ -193,13 +218,56 @@ export class CallManager {
 
     async leaveCall(reason = 'local') {
         this.stopTracks();
+        this.stopTimer();
 
         await this.client.leave();
+        
+        // Reset UI
+        this.isMinimized = false;
+        this.modal.classList.remove('call-minimized');
         this.hideModal();
-        this.remoteContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><p>Waiting for user to join...</p></div>';
+        
+        this.remoteContainer.innerHTML = `
+            <div id="remote-placeholder" class="flex flex-col items-center justify-center text-gray-500">
+                <div class="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-3 animate-pulse">
+                    <i class="fas fa-user-circle text-4xl opacity-50"></i>
+                </div>
+                <p class="text-white/50 text-sm font-medium animate-pulse">Waiting for user...</p>
+            </div>
+        `;
+        // Refresh reference
+        this.remotePlaceholder = document.getElementById('remote-placeholder');
 
         if (this.onCallEnd) {
             this.onCallEnd(reason);
+        }
+    }
+
+    startTimer() {
+        this.stopTimer();
+        this.startTime = Date.now();
+        this.callTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const secs = (elapsed % 60).toString().padStart(2, '0');
+            if (this.timerEl) this.timerEl.textContent = `${mins}:${secs}`;
+        }, 1000);
+    }
+
+    stopTimer() {
+        if (this.callTimer) clearInterval(this.callTimer);
+        this.callTimer = null;
+        if (this.timerEl) this.timerEl.textContent = '00:00';
+    }
+
+    toggleMinimize() {
+        this.isMinimized = !this.isMinimized;
+        if (this.isMinimized) {
+            this.modal.classList.add('call-minimized');
+            this.btnMinimize.innerHTML = '<i class="fas fa-expand-alt"></i>';
+        } else {
+            this.modal.classList.remove('call-minimized');
+            this.btnMinimize.innerHTML = '<i class="fas fa-compress-alt"></i>';
         }
     }
 
