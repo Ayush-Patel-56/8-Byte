@@ -1,8 +1,10 @@
 {
-  "rewrites": [
-    { "source": "/dashboard",       "destination": "/dashboard.html" },
-    { "source": "/community",       "destination": "/community.html" },
-    { "source": "/messages",        "destination": "/direct_messages.html" },
-    { "source": "/u/:username",     "destination": "/public_profile.html" }
+  "name": "8-byte-frontend",
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
