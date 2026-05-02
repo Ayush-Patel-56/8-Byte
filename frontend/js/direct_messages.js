@@ -129,7 +129,7 @@ export function initDirectMessages() {
                 await sendMessage(`📞 Started a video call`);
             } catch (err) {
                 console.error("Call failed", err);
-                showToast("Failed to start call", "error");
+                showToast(err.message || "Failed to start call", "error");
             }
         });
     }
@@ -145,7 +145,7 @@ export function initDirectMessages() {
                 await sendMessage(`📞 Started a voice call`);
             } catch (err) {
                 console.error("Voice Call failed", err);
-                showToast("Failed to start voice call", "error");
+                showToast(err.message || "Failed to start voice call", "error");
             }
         });
     }
@@ -153,8 +153,11 @@ export function initDirectMessages() {
 
 
     // Wiring up Call End message
-    callManager.onCallEnd = async () => {
-        if (selectedThreadId) {
+    callManager.onCallEnd = async (reason) => {
+        // Only the person who clicks 'End' (local) sends the message.
+        // If the call ended because the remote user left, we don't send another signal
+        // because they already sent one or we just want to close quietly.
+        if (selectedThreadId && reason === 'local') {
             await sendMessage("🚫 Call ended");
         }
     };

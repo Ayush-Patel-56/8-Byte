@@ -80,15 +80,28 @@ export class CallManager {
             // Join
             await this.client.join(appId, channel, token, uid);
 
-            // Create & Publish Local Tracks
-            this.localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+            // 1. Create Audio Track (Handle Permissions)
+            try {
+                this.localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+            } catch (err) {
+                console.error("Mic permission denied:", err);
+                throw new Error("Microphone access denied. Please enable it in your browser settings.");
+            }
 
+            // 2. Create Video Track (If applicable)
             if (isVideo) {
-                this.localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
-                // Play Local Video
-                this.localTracks.videoTrack.play(this.localContainer);
-                // Publish
-                await this.client.publish([this.localTracks.audioTrack, this.localTracks.videoTrack]);
+                try {
+                    this.localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
+                    // Play Local Video
+                    this.localTracks.videoTrack.play(this.localContainer);
+                    // Publish
+                    await this.client.publish([this.localTracks.audioTrack, this.localTracks.videoTrack]);
+                } catch (err) {
+                    console.error("Camera permission denied:", err);
+                    // Fallback to audio-only if camera fails? Or fail completely?
+                    // Let's fail completely for a "Video Call" to avoid confusion.
+                    throw new Error("Camera access denied. Please enable it in your browser settings.");
+                }
             } else {
                 // Audio Only - Show placeholder
                 this.localContainer.innerHTML = '<div class="flex items-center justify-center h-full bg-gray-800 text-gray-500"><i class="fas fa-microphone-lines text-3xl animate-pulse"></i></div>';
@@ -100,7 +113,21 @@ export class CallManager {
 
         } catch (error) {
             console.error("Join error:", error);
+            // Cleanup any tracks that were partially created
+            this.stopTracks();
             throw error;
+        }
+    }
+
+    // Helper to stop all local tracks
+    stopTracks() {
+        for (let trackName in this.localTracks) {
+            var track = this.localTracks[trackName];
+            if (track) {
+                track.stop();
+                track.close();
+                this.localTracks[trackName] = null;
+            }
         }
     }
 
@@ -159,25 +186,20 @@ export class CallManager {
         // For 1:1 calls, if they leave, we should end the call automatically
         this.updateStatus("Remote user ended the call.");
         await new Promise(r => setTimeout(r, 1500)); // Show message for 1.5s
-        await this.leaveCall();
+        
+        // Pass 'remote' so we don't send another 'Call ended' signal
+        await this.leaveCall('remote');
     }
 
-    async leaveCall() {
-        for (let trackName in this.localTracks) {
-            var track = this.localTracks[trackName];
-            if (track) {
-                track.stop();
-                track.close();
-                this.localTracks[trackName] = null;
-            }
-        }
+    async leaveCall(reason = 'local') {
+        this.stopTracks();
 
         await this.client.leave();
         this.hideModal();
         this.remoteContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500"><p>Waiting for user to join...</p></div>';
 
         if (this.onCallEnd) {
-            this.onCallEnd();
+            this.onCallEnd(reason);
         }
     }
 
